@@ -29,7 +29,7 @@ namespace raph
         private Thread _WorkThread = null;
 
         // AST树
-        private Language.ASTNode_StatementList _AST = null;
+        private Language.ASTNode.StatementList _AST = null;
 
         // 初始化控件状态
         private void initState()

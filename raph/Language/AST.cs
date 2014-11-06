@@ -15,7 +15,15 @@ namespace raph.Language
         Minus,
         Mul,
         Div,
-        Power
+        Power,
+        Greater,
+        Less,
+        GreaterEqual,
+        LessEqual,
+        Equal,
+        NotEqual,
+        LogicalAnd,
+        LogicalOr
     }
 
     /// <summary>
@@ -26,7 +34,7 @@ namespace raph.Language
         Negative
     }
 
-    public class ASTNode
+    public abstract class ASTNode
     {
         /// <summary>
         /// AST语法树类型
@@ -44,6 +52,8 @@ namespace raph.Language
             BinaryExpression,
             UnaryExpression,
             DigitLiteral,
+            StringLiteral,
+            BooleanLiteral,
             CallExpression,
             SymbolExpression,
             TupleExpression
@@ -72,432 +82,478 @@ namespace raph.Language
             _Type = AType;
             _LineNumber = LineNum;
         }
-    }
 
-    public class ASTNode_StatementList : ASTNode
-    {
-        private List<ASTNode_Statement> _Statements = new List<ASTNode_Statement>();
-
-        public IList<ASTNode_Statement> Statements
+        #region 具体AST节点实现
+        public class StatementList : ASTNode
         {
-            get
+            private List<Statement> _Statements = new List<Statement>();
+
+            public IList<Statement> Statements
             {
-                return _Statements;
+                get
+                {
+                    return _Statements;
+                }
+            }
+
+            public StatementList()
+                : base(ASTType.StatementList) { }
+        }
+
+        public class Statement : ASTNode
+        {
+            public Statement(ASTType AType, int LineNum)
+                : base(AType, LineNum) { }
+        }
+
+        public class Assignment : Statement
+        {
+            private string _Identifier = String.Empty;
+            private string _IdentifierLower = String.Empty;
+            private Expression _Expression = null;
+
+            public string Identifier
+            {
+                get
+                {
+                    return _Identifier;
+                }
+                set
+                {
+                    _Identifier = value;
+                    _IdentifierLower = _Identifier.ToLower();
+                }
+            }
+
+            public string IdentifierLower
+            {
+                get
+                {
+                    return _IdentifierLower;
+                }
+            }
+
+            public Expression AssignmentExpression
+            {
+                get
+                {
+                    return _Expression;
+                }
+                set
+                {
+                    _Expression = value;
+                }
+            }
+
+            public Assignment(int LineNum, string Id, Expression Expr)
+                : base(ASTType.Assignment, LineNum)
+            {
+                Identifier = Id;
+                AssignmentExpression = Expr;
             }
         }
 
-        public ASTNode_StatementList()
-            : base(ASTNode.ASTType.StatementList) { }
-    }
-
-    public class ASTNode_Statement : ASTNode
-    {
-        public ASTNode_Statement(ASTNode.ASTType AType, int LineNum)
-            : base(AType, LineNum) { }
-    }
-
-    public class ASTNode_Assignment : ASTNode_Statement
-    {
-        private string _Identifier = String.Empty;
-        private string _IdentifierLower = String.Empty;
-        private ASTNode_Expression _Expression = null;
-
-        public string Identifier
+        public class Call : Statement
         {
-            get
+            private string _Identifier = String.Empty;
+            private string _IdentifierLower = String.Empty;
+            private ArgList _ArgList = null;
+
+            public string Identifier
             {
-                return _Identifier;
+                get
+                {
+                    return _Identifier;
+                }
+                set
+                {
+                    _Identifier = value;
+                    _IdentifierLower = _Identifier.ToLower();
+                }
             }
-            set
+
+            public string IdentifierLower
             {
-                _Identifier = value;
-                _IdentifierLower = _Identifier.ToLower();
+                get
+                {
+                    return _IdentifierLower;
+                }
+            }
+
+            public ArgList Args
+            {
+                get
+                {
+                    return _ArgList;
+                }
+                set
+                {
+                    _ArgList = value;
+                }
+            }
+
+            public Call(int LineNum, string Id, ArgList AL)
+                : base(ASTType.Call, LineNum)
+            {
+                Identifier = Id;
+                Args = AL;
             }
         }
 
-        public string IdentifierLower
+        public class ForStatement : Statement
         {
-            get
+            private string _Identifier = String.Empty;
+            private string _IdentifierLower = String.Empty;
+            private Expression _FromExpression = null;
+            private Expression _ToExpression = null;
+            private Expression _StepExpression = null;
+            private StatementList _ExecBlock = null;
+
+            public string Identifier
             {
-                return _IdentifierLower;
+                get
+                {
+                    return _Identifier;
+                }
+                set
+                {
+                    _Identifier = value;
+                    _IdentifierLower = _Identifier.ToLower();
+                }
+            }
+
+            public string IdentifierLower
+            {
+                get
+                {
+                    return _IdentifierLower;
+                }
+            }
+
+            public Expression FromExpression
+            {
+                get
+                {
+                    return _FromExpression;
+                }
+                set
+                {
+                    _FromExpression = value;
+                }
+            }
+
+            public Expression ToExpression
+            {
+                get
+                {
+                    return _ToExpression;
+                }
+                set
+                {
+                    _ToExpression = value;
+                }
+            }
+
+            public Expression StepExpression
+            {
+                get
+                {
+                    return _StepExpression;
+                }
+                set
+                {
+                    _StepExpression = value;
+                }
+            }
+
+            public StatementList ExecBlock
+            {
+                get
+                {
+                    return _ExecBlock;
+                }
+                set
+                {
+                    _ExecBlock = value;
+                }
+            }
+
+            public ForStatement(int LineNum)
+                : base(ASTType.ForStatement, LineNum) { }
+        }
+        public class ArgList : ASTNode
+        {
+            private List<Expression> _Args = new List<Expression>();
+
+            public IList<Expression> Args
+            {
+                get
+                {
+                    return _Args;
+                }
+            }
+
+            public ArgList()
+                : base(ASTType.ArgList) { }
+        }
+
+        public class Expression : ASTNode
+        {
+            public Expression(ASTType AType, int LineNum)
+                : base(AType, LineNum) { }
+        }
+
+        public class BinaryExpression : Expression
+        {
+            private BinaryOp _BinaryOperator;
+            private Expression _Left;
+            private Expression _Right;
+
+            public BinaryOp BinaryOperator
+            {
+                get
+                {
+                    return _BinaryOperator;
+                }
+                set
+                {
+                    _BinaryOperator = value;
+                }
+            }
+
+            public Expression Left
+            {
+                get
+                {
+                    return _Left;
+                }
+                set
+                {
+                    _Left = value;
+                }
+            }
+
+            public Expression Right
+            {
+                get
+                {
+                    return _Right;
+                }
+                set
+                {
+                    _Right = value;
+                }
+            }
+
+            public BinaryExpression(int LineNum, BinaryOp Opt, Expression LeftNode, Expression RightNode)
+                : base(ASTType.BinaryExpression, LineNum)
+            {
+                BinaryOperator = Opt;
+                Left = LeftNode;
+                Right = RightNode;
+            }
+        }
+        public class UnaryExpression : Expression
+        {
+            private UnaryOp _UnaryOperator;
+            private Expression _Right;
+
+            public UnaryOp UnaryOperator
+            {
+                get
+                {
+                    return _UnaryOperator;
+                }
+                set
+                {
+                    _UnaryOperator = value;
+                }
+            }
+
+            public Expression Right
+            {
+                get
+                {
+                    return _Right;
+                }
+                set
+                {
+                    _Right = value;
+                }
+            }
+
+            public UnaryExpression(int LineNum, UnaryOp Opt, Expression RightNode)
+                : base(ASTType.UnaryExpression, LineNum)
+            {
+                UnaryOperator = Opt;
+                Right = RightNode;
             }
         }
 
-        public ASTNode_Expression Expression
+        public class DigitLiteral : Expression
         {
-            get
+            private double _Value;
+
+            public double Value
             {
-                return _Expression;
+                get
+                {
+                    return _Value;
+                }
+                set
+                {
+                    _Value = value;
+                }
             }
-            set
+
+            public DigitLiteral(int LineNum, double Val)
+                : base(ASTType.DigitLiteral, LineNum)
             {
-                _Expression = value;
+                Value = Val;
             }
         }
 
-        public ASTNode_Assignment(int LineNum, string Id, ASTNode_Expression Expr)
-            : base(ASTNode.ASTType.Assignment, LineNum)
+        public class StringLiteral : Expression
         {
-            Identifier = Id;
-            Expression = Expr;
-        }
-    }
-    
-    public class ASTNode_Call : ASTNode_Statement
-    {
-        private string _Identifier = String.Empty;
-        private string _IdentifierLower = String.Empty;
-        private ASTNode_ArgList _ArgList = null;
+            private string _Value;
 
-        public string Identifier
-        {
-            get
+            public string Value
             {
-                return _Identifier;
+                get
+                {
+                    return _Value;
+                }
+                set
+                {
+                    _Value = value;
+                }
             }
-            set
+
+            public StringLiteral(int LineNum, string Val)
+                : base(ASTType.StringLiteral, LineNum)
             {
-                _Identifier = value;
-                _IdentifierLower = _Identifier.ToLower();
+                Value = Val;
             }
         }
 
-        public string IdentifierLower
+        public class BooleanLiteral : Expression
         {
-            get
+            private bool _Value;
+
+            public bool Value
             {
-                return _IdentifierLower;
+                get
+                {
+                    return _Value;
+                }
+                set
+                {
+                    _Value = value;
+                }
+            }
+
+            public BooleanLiteral(int LineNum, bool Val)
+                : base(ASTType.BooleanLiteral, LineNum)
+            {
+                Value = Val;
             }
         }
 
-        public ASTNode_ArgList ArgList
+        public class CallExpression : Expression
         {
-            get
+            private string _Identifier = String.Empty;
+            private string _IdentifierLower = String.Empty;
+            private ArgList _ArgList = null;
+
+            public string Identifier
             {
-                return _ArgList;
+                get
+                {
+                    return _Identifier;
+                }
+                set
+                {
+                    _Identifier = value;
+                    _IdentifierLower = _Identifier.ToLower();
+                }
             }
-            set
+
+            public string IdentifierLower
             {
-                _ArgList = value;
+                get
+                {
+                    return _IdentifierLower;
+                }
+            }
+
+            public ArgList Args
+            {
+                get
+                {
+                    return _ArgList;
+                }
+                set
+                {
+                    _ArgList = value;
+                }
+            }
+
+            public CallExpression(int LineNum, string Id, ArgList AL)
+                : base(ASTType.CallExpression, LineNum)
+            {
+                Identifier = Id;
+                Args = AL;
             }
         }
 
-        public ASTNode_Call(int LineNum, string Id, ASTNode_ArgList AL)
-            : base(ASTNode.ASTType.Call, LineNum)
+        public class SymbolExpression : Expression
         {
-            Identifier = Id;
-            ArgList = AL;
-        }
-    }
+            private string _Identifier = String.Empty;
+            private string _IdentifierLower = String.Empty;
 
-    public class ASTNode_ForStatement : ASTNode_Statement
-    {
-        private string _Identifier = String.Empty;
-        private string _IdentifierLower = String.Empty;
-        private ASTNode_Expression _FromExpression = null;
-        private ASTNode_Expression _ToExpression = null;
-        private ASTNode_Expression _StepExpression = null;
-        private ASTNode_StatementList _ExecBlock = null;
-
-        public string Identifier
-        {
-            get
+            public string Identifier
             {
-                return _Identifier;
+                get
+                {
+                    return _Identifier;
+                }
+                set
+                {
+                    _Identifier = value;
+                    _IdentifierLower = _Identifier.ToLower();
+                }
             }
-            set
-            {
-                _Identifier = value;
-                _IdentifierLower = _Identifier.ToLower();
-            }
-        }
 
-        public string IdentifierLower
-        {
-            get
+            public string IdentifierLower
             {
-                return _IdentifierLower;
+                get
+                {
+                    return _IdentifierLower;
+                }
+            }
+
+            public SymbolExpression(int LineNum, string Id)
+                : base(ASTType.SymbolExpression, LineNum)
+            {
+                Identifier = Id;
             }
         }
 
-        public ASTNode_Expression FromExpression
+        public class TupleExpression : Expression
         {
-            get
+            private List<Expression> _Args = new List<Expression>();
+
+            public IList<Expression> Args
             {
-                return _FromExpression;
+                get
+                {
+                    return _Args;
+                }
             }
-            set
-            {
-                _FromExpression = value;
-            }
+
+            public TupleExpression(int LineNum)
+                : base(ASTType.TupleExpression, LineNum) { }
         }
-
-        public ASTNode_Expression ToExpression
-        {
-            get
-            {
-                return _ToExpression;
-            }
-            set
-            {
-                _ToExpression = value;
-            }
-        }
-
-        public ASTNode_Expression StepExpression
-        {
-            get
-            {
-                return _StepExpression;
-            }
-            set
-            {
-                _StepExpression = value;
-            }
-        }
-
-        public ASTNode_StatementList ExecBlock
-        {
-            get
-            {
-                return _ExecBlock;
-            }
-            set
-            {
-                _ExecBlock = value;
-            }
-        }
-
-        public ASTNode_ForStatement(int LineNum)
-            : base(ASTNode.ASTType.ForStatement, LineNum) { }
-    }
-
-    public class ASTNode_ArgList : ASTNode
-    {
-        private List<ASTNode_Expression> _Args = new List<ASTNode_Expression>();
-        
-        public IList<ASTNode_Expression> Args
-        {
-            get
-            {
-                return _Args;
-            }
-        }
-
-        public ASTNode_ArgList()
-            : base(ASTNode.ASTType.ArgList) { }
-    }
-
-    public class ASTNode_Expression : ASTNode
-    {
-        public ASTNode_Expression(ASTNode.ASTType AType, int LineNum)
-            : base(AType, LineNum) { }
-    }
-
-    public class ASTNode_BinaryExpression : ASTNode_Expression
-    {
-        private BinaryOp _BinaryOperator;
-        private ASTNode_Expression _Left;
-        private ASTNode_Expression _Right;
-
-        public BinaryOp BinaryOperator
-        {
-            get
-            {
-                return _BinaryOperator;
-            }
-            set
-            {
-                _BinaryOperator = value;
-            }
-        }
-
-        public ASTNode_Expression Left
-        {
-            get
-            {
-                return _Left;
-            }
-            set
-            {
-                _Left = value;
-            }
-        }
-
-        public ASTNode_Expression Right
-        {
-            get
-            {
-                return _Right;
-            }
-            set
-            {
-                _Right = value;
-            }
-        }
-
-        public ASTNode_BinaryExpression(int LineNum, BinaryOp Opt, ASTNode_Expression LeftNode, ASTNode_Expression RightNode)
-            : base(ASTNode.ASTType.BinaryExpression, LineNum)
-        {
-            BinaryOperator = Opt;
-            Left = LeftNode;
-            Right = RightNode;
-        }
-    }
-
-    public class ASTNode_UnaryExpression : ASTNode_Expression
-    {
-        private UnaryOp _UnaryOperator;
-        private ASTNode_Expression _Right;
-
-        public UnaryOp UnaryOperator
-        {
-            get
-            {
-                return _UnaryOperator;
-            }
-            set
-            {
-                _UnaryOperator = value;
-            }
-        }
-        
-        public ASTNode_Expression Right
-        {
-            get
-            {
-                return _Right;
-            }
-            set
-            {
-                _Right = value;
-            }
-        }
-
-        public ASTNode_UnaryExpression(int LineNum, UnaryOp Opt, ASTNode_Expression RightNode)
-            : base(ASTNode.ASTType.UnaryExpression, LineNum)
-        {
-            UnaryOperator = Opt;
-            Right = RightNode;
-        }
-    }
-
-    public class ASTNode_DigitLiteral : ASTNode_Expression
-    {
-        private double _Value;
-
-        public double Value
-        {
-            get
-            {
-                return _Value;
-            }
-            set
-            {
-                _Value = value;
-            }
-        }
-
-        public ASTNode_DigitLiteral(int LineNum, double Val)
-            : base(ASTNode.ASTType.DigitLiteral, LineNum)
-        {
-            Value = Val;
-        }
-    }
-
-    public class ASTNode_CallExpression : ASTNode_Expression
-    {
-        private string _Identifier = String.Empty;
-        private string _IdentifierLower = String.Empty;
-        private ASTNode_ArgList _ArgList = null;
-
-        public string Identifier
-        {
-            get
-            {
-                return _Identifier;
-            }
-            set
-            {
-                _Identifier = value;
-                _IdentifierLower = _Identifier.ToLower();
-            }
-        }
-
-        public string IdentifierLower
-        {
-            get
-            {
-                return _IdentifierLower;
-            }
-        }
-
-        public ASTNode_ArgList ArgList
-        {
-            get
-            {
-                return _ArgList;
-            }
-            set
-            {
-                _ArgList = value;
-            }
-        }
-
-        public ASTNode_CallExpression(int LineNum, string Id, ASTNode_ArgList AL)
-            : base(ASTNode.ASTType.CallExpression, LineNum)
-        {
-            Identifier = Id;
-            ArgList = AL;
-        }
-    }
-
-    public class ASTNode_SymbolExpression : ASTNode_Expression
-    {
-        private string _Identifier = String.Empty;
-        private string _IdentifierLower = String.Empty;
-
-        public string Identifier
-        {
-            get
-            {
-                return _Identifier;
-            }
-            set
-            {
-                _Identifier = value;
-                _IdentifierLower = _Identifier.ToLower();
-            }
-        }
-
-        public string IdentifierLower
-        {
-            get
-            {
-                return _IdentifierLower;
-            }
-        }
-
-        public ASTNode_SymbolExpression(int LineNum, string Id)
-            : base(ASTNode.ASTType.SymbolExpression, LineNum)
-        {
-            Identifier = Id;
-        }
-    }
-
-    public class ASTNode_TupleExpression : ASTNode_Expression
-    {
-        private List<ASTNode_Expression> _Args = new List<ASTNode_Expression>();
-
-        public IList<ASTNode_Expression> Args
-        {
-            get
-            {
-                return _Args;
-            }
-        }
-
-        public ASTNode_TupleExpression(int LineNum)
-            : base(ASTNode.ASTType.TupleExpression, LineNum) { }
+        #endregion
     }
 }

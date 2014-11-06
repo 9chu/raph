@@ -35,7 +35,7 @@ namespace raph
             }
         }
 
-        public void RunAST(ASTNode_StatementList Block)
+        public void RunAST(ASTNode.StatementList Block)
         {
             try
             {

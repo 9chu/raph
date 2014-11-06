@@ -61,6 +61,8 @@
     <Compile Include="DocumentForm.Designer.cs">
       <DependentUpon>DocumentForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="Language\RuntimeContext.cs" />
+    <Compile Include="Language\RuntimeValue.cs" />
     <Compile Include="PaintForm.cs">
       <SubType>Form</SubType>
     </Compile>

@@ -22,6 +22,7 @@ namespace raph.Language
             RightBrace,      // }
             Comma,           // ,
             DigitLiteral,    // 数字字面量
+            StringLiteral,   // 字符串字面量
             Identifier,      // 标识符
 
             // 运算符
@@ -30,9 +31,19 @@ namespace raph.Language
             Mul,             // *
             Div,             // /
             Power,           // **
+            Greater,         // >
+            Less,            // <
+            GreaterEqual,    // >=
+            LessEqual,       // <=
+            Equal,           // ==
+            NotEqual,        // !=
+            LogicalAnd,      // &&
+            LogicalOr,       // ||
 
             // 关键词
             Is = 100,
+            True,
+            False,
             For,
             From,
             To,
@@ -42,7 +53,7 @@ namespace raph.Language
         // 关键词列表
         private static readonly string[] KeywordList = new string[]
         {
-            "is", "for", "from", "to", "step"
+            "is", "true", "false", "for", "from", "to", "step"
         };
 
         /// <summary>
@@ -78,8 +89,26 @@ namespace raph.Language
                     return "'/'";
                 case Token.Power:
                     return "'**'";
+                case Token.Greater:
+                    return "'>'";
+                case Token.Less:
+                    return "'<'";
+                case Token.GreaterEqual:
+                    return "'>='";
+                case Token.LessEqual:
+                    return "'<='";
+                case Token.Equal:
+                    return "'=='";
+                case Token.NotEqual:
+                    return "'!='";
+                case Token.LogicalAnd:
+                    return "'&&'";
+                case Token.LogicalOr:
+                    return "'||'";
                 case Token.DigitLiteral:
                     return "<digit>";
+                case Token.StringLiteral:
+                    return "<string>";
                 case Token.Identifier:
                     return "<identifier>";
                 default:
@@ -97,6 +126,7 @@ namespace raph.Language
         private double _CurDigit = 0;
         private string _CurId = String.Empty;
         private string _CurIdLower = String.Empty;
+        private string _CurString = String.Empty;
         private int _Position = 0;
         private int _Line = 1;
         private int _Row = 0;
@@ -223,6 +253,103 @@ namespace raph.Language
         }
 
         /// <summary>
+        /// 读取字符串
+        /// </summary>
+        /// <returns>读取的字符串</returns>
+        private string parseString()
+        {
+            if ('"' != readNext())
+                throw new LexcialException(_Position, _Line, _Row,
+                    String.Format("internal error."));
+
+            StringBuilder tBuilder = new StringBuilder();
+            while (true)
+            {
+                int c = peekNext();
+                if (c == '\r' || c == '\n' || c == '\0')
+                    throw new LexcialException(_Position, _Line, _Row,
+                        String.Format("unexpected character '{0}' in string literal.", formatCharacter(c)));
+                else if (c == '"')
+                {
+                    readNext();
+                    break;
+                }
+                else if (c == '\\')  // 转义字符
+                {
+                    readNext();
+
+                    switch (c = peekNext())
+                    {
+                        case '"':
+                            readNext();
+                            tBuilder.Append('"');
+                            break;
+                        case '\\':
+                            readNext();
+                            tBuilder.Append('\\');
+                            break;
+                        case '/':
+                            readNext();
+                            tBuilder.Append('/');
+                            break;
+                        case 'b':
+                            readNext();
+                            tBuilder.Append('\b');
+                            break;
+                        case 'f':
+                            readNext();
+                            tBuilder.Append('\f');
+                            break;
+                        case 'n':
+                            readNext();
+                            tBuilder.Append('\n');
+                            break;
+                        case 'r':
+                            readNext();
+                            tBuilder.Append('\r');
+                            break;
+                        case 't':
+                            readNext();
+                            tBuilder.Append('\t');
+                            break;
+                        case 'u':
+                            {
+                                readNext();
+
+                                int tCurEscape = 0;
+                                for (int i = 0; i < 4; ++i)
+                                {
+                                    c = peekNext();
+                                    if (c >= '0' && c <= '9')
+                                        tCurEscape = tCurEscape * 16 + (c - '0');
+                                    else if (c >= 'a' && c <= 'z')
+                                        tCurEscape = tCurEscape * 16 + (c - 'a');
+                                    else if (c >= 'A' && c <= 'Z')
+                                        tCurEscape = tCurEscape * 16 + (c - 'a');
+                                    else
+                                        throw new LexcialException(_Position, _Line, _Row,
+                                            String.Format("expect digit character, but found '{0}'.", formatCharacter(c)));
+                                    readNext();
+                                }
+                                tBuilder.Append((char)tCurEscape);
+                            }
+                            break;
+                        default:
+                            throw new LexcialException(_Position, _Line, _Row,
+                                String.Format("unexpected escape character '{0}'.", formatCharacter(c)));
+                    }
+                }
+                else
+                {
+                    readNext();
+                    tBuilder.Append((char)c);
+                }   
+            }
+
+            return tBuilder.ToString();
+        }
+
+        /// <summary>
         /// 当前的词法元素
         /// </summary>
         public Token CurrentToken
@@ -263,6 +390,17 @@ namespace raph.Language
             get
             {
                 return _CurIdLower;
+            }
+        }
+
+        /// <summary>
+        /// 字符串字面量
+        /// </summary>
+        public string StringLiteral
+        {
+            get
+            {
+                return _CurString;
             }
         }
 
@@ -360,6 +498,74 @@ namespace raph.Language
                     readNext();
                     _CurToken = Token.Div;
                     return;
+                case '>':
+                    readNext();
+                    if (peekNext() == '=')  // >=
+                    {
+                        readNext();
+                        _CurToken = Token.GreaterEqual;
+                    }
+                    else
+                        _CurToken = Token.Greater;  // >
+                    return;
+                case '<':
+                    readNext();
+                    if (peekNext() == '=')  // <=
+                    {
+                        readNext();
+                        _CurToken = Token.LessEqual;
+                    }
+                    else
+                        _CurToken = Token.Less;  // <
+                    return;
+                case '=':
+                    readNext();
+                    if (peekNext() == '=')  // ==
+                    {
+                        readNext();
+                        _CurToken = Token.Equal;
+                    }
+                    else
+                        throw new LexcialException(_Position, _Line, _Row,
+                            String.Format("expect '=', but found '{0}'.", formatCharacter(c)));
+                    return;
+                case '!':
+                    readNext();
+                    if (peekNext() == '=')  // !=
+                    {
+                        readNext();
+                        _CurToken = Token.NotEqual;
+                    }
+                    else
+                        throw new LexcialException(_Position, _Line, _Row,
+                            String.Format("expect '=', but found '{0}'.", formatCharacter(c)));
+                    return;
+                case '&':
+                    readNext();
+                    if (peekNext() == '&')  // &&
+                    {
+                        readNext();
+                        _CurToken = Token.LogicalAnd;
+                    }
+                    else
+                        throw new LexcialException(_Position, _Line, _Row,
+                            String.Format("expect '&', but found '{0}'.", formatCharacter(c)));
+                    return;
+                case '|':
+                    readNext();
+                    if (peekNext() == '|')  // ||
+                    {
+                        readNext();
+                        _CurToken = Token.LogicalOr;
+                    }
+                    else
+                        throw new LexcialException(_Position, _Line, _Row,
+                            String.Format("expect '|', but found '{0}'.", formatCharacter(c)));
+                    return;
+                case '"':
+                    _CurToken = Token.StringLiteral;
+                    _CurString = parseString();
+                    return;
                 default:
                     if (c >= '0' && c <= '9')
                     {
@@ -410,39 +616,12 @@ namespace raph.Language
         {
             switch (_CurToken)
             {
-                case Token.EOF:
-                    return "<EOF>";
-                case Token.Semico:
-                    return "';'";
-                case Token.LeftBracket:
-                    return "'('";
-                case Token.RightBracket:
-                    return "')'";
-                case Token.LeftBrace:
-                    return "'{'";
-                case Token.RightBrace:
-                    return "'}'";
-                case Token.Comma:
-                    return "','";
-                case Token.Plus:
-                    return "'+'";
-                case Token.Minus:
-                    return "'-'";
-                case Token.Mul:
-                    return "'*'";
-                case Token.Div:
-                    return "'/'";
-                case Token.Power:
-                    return "'**'";
                 case Token.DigitLiteral:
                     return _CurDigit.ToString();
                 case Token.Identifier:
                     return "\"" + _CurId.ToString() + "\"";
                 default:
-                    if (_CurToken >= Token.Is && (int)_CurToken < (int)Token.Is + KeywordList.Length)
-                        return String.Format("<{0}>", KeywordList[_CurToken - Token.Is]);
-                    else
-                        return "<unknown>";
+                    return FormatToken(_CurToken);
             }
         }
 

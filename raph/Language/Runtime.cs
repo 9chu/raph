@@ -273,7 +273,7 @@ namespace raph.Language
         }
 
         // 执行call操作
-        private object applyCallOperator(string Identifier, string IdentifierLower, ASTNode_ArgList Args, int LineNumber)
+        private object applyCallOperator(string Identifier, string IdentifierLower, ASTNode.ArgList Args, int LineNumber)
         {
             object pNativeFunc = fetchValueOfIdentifier(Identifier, IdentifierLower, LineNumber);
             if (pNativeFunc is NativeCallHandler == false)
@@ -305,7 +305,7 @@ namespace raph.Language
         }
 
         // 计算元组的值
-        private object calcuTupleValue(ASTNode_TupleExpression Expression, int LineNumber)
+        private object calcuTupleValue(ASTNode.TupleExpression Expression, int LineNumber)
         {
             // 根据元组的成员数进行转换
             if (Expression.Args.Count < 2)
@@ -324,7 +324,7 @@ namespace raph.Language
         }
         
         // 执行for循环
-        private void doForLoop(string Identifier, string IdentifierLower, object From, object To, object Step, ASTNode_StatementList Block, int LineNumber)
+        private void doForLoop(string Identifier, string IdentifierLower, object From, object To, object Step, ASTNode.StatementList Block, int LineNumber)
         {
             if (!(From is double))
                 throw new RuntimeException(LineNumber, "from expression must return a digit.");
@@ -480,16 +480,16 @@ namespace raph.Language
         /// 执行一个区块
         /// </summary>
         /// <param name="StatementList">语句列表语法树</param>
-        public void ExecBlock(ASTNode_StatementList StatementList)
+        public void ExecBlock(ASTNode.StatementList StatementList)
         {
-            foreach (ASTNode_Statement s in StatementList.Statements)
+            foreach (ASTNode.Statement s in StatementList.Statements)
             {
                 switch (s.Type)
                 {
                     case ASTNode.ASTType.Assignment:
                         {
-                            ASTNode_Assignment tAssignment = (ASTNode_Assignment)s;
-                            object tResult = ExecExpression(tAssignment.Expression);
+                            ASTNode.Assignment tAssignment = (ASTNode.Assignment)s;
+                            object tResult = ExecExpression(tAssignment.AssignmentExpression);
                             if (!_Environment.ContainsKey(tAssignment.IdentifierLower))
                                 _Environment.Add(tAssignment.IdentifierLower, tResult);
                             else
@@ -498,13 +498,13 @@ namespace raph.Language
                         break;
                     case ASTNode.ASTType.Call:
                         {
-                            ASTNode_Call tCall = (ASTNode_Call)s;
-                            applyCallOperator(tCall.Identifier, tCall.IdentifierLower, tCall.ArgList, s.LineNumber);
+                            ASTNode.Call tCall = (ASTNode.Call)s;
+                            applyCallOperator(tCall.Identifier, tCall.IdentifierLower, tCall.Args, s.LineNumber);
                         }
                         break;
                     case ASTNode.ASTType.ForStatement:
                         {
-                            ASTNode_ForStatement tForStatement = (ASTNode_ForStatement)s;
+                            ASTNode.ForStatement tForStatement = (ASTNode.ForStatement)s;
                             object tFromResult = ExecExpression(tForStatement.FromExpression);
                             object tToResult = ExecExpression(tForStatement.ToExpression);
                             object tStepResult = tForStatement.StepExpression == null ? null : ExecExpression(tForStatement.StepExpression);
@@ -530,41 +530,41 @@ namespace raph.Language
         /// </summary>
         /// <param name="Expression">表达式语法树</param>
         /// <returns>执行结果</returns>
-        public object ExecExpression(ASTNode_Expression Expression)
+        public object ExecExpression(ASTNode.Expression Expression)
         {
             switch (Expression.Type)
             {
                 case ASTNode.ASTType.BinaryExpression:
                     {
-                        ASTNode_BinaryExpression tBinaryExpression = (ASTNode_BinaryExpression)Expression;
+                        ASTNode.BinaryExpression tBinaryExpression = (ASTNode.BinaryExpression)Expression;
                         object tLeftResult = ExecExpression(tBinaryExpression.Left);
                         object tRightResult = ExecExpression(tBinaryExpression.Right);
                         return applyBinaryOperator(tBinaryExpression.BinaryOperator, tLeftResult, tRightResult, Expression.LineNumber);
                     }
                 case ASTNode.ASTType.UnaryExpression:
                     {
-                        ASTNode_UnaryExpression tUnaryExpression = (ASTNode_UnaryExpression)Expression;
+                        ASTNode.UnaryExpression tUnaryExpression = (ASTNode.UnaryExpression)Expression;
                         object tRightResult = ExecExpression(tUnaryExpression.Right);
                         return applyUnaryOperator(tUnaryExpression.UnaryOperator, tRightResult, Expression.LineNumber);
                     }
                 case ASTNode.ASTType.DigitLiteral:
                     {
-                        ASTNode_DigitLiteral tDigitLiteral = (ASTNode_DigitLiteral)Expression;
+                        ASTNode.DigitLiteral tDigitLiteral = (ASTNode.DigitLiteral)Expression;
                         return tDigitLiteral.Value;
                     }
                 case ASTNode.ASTType.CallExpression:
                     {
-                        ASTNode_CallExpression tCallExpression = (ASTNode_CallExpression)Expression;
+                        ASTNode.CallExpression tCallExpression = (ASTNode.CallExpression)Expression;
                         return applyCallOperator(
                             tCallExpression.Identifier, 
                             tCallExpression.IdentifierLower, 
-                            tCallExpression.ArgList,
+                            tCallExpression.Args,
                             Expression.LineNumber
                             );
                     }
                 case ASTNode.ASTType.SymbolExpression:
                     {
-                        ASTNode_SymbolExpression tSymbolExpression = (ASTNode_SymbolExpression)Expression;
+                        ASTNode.SymbolExpression tSymbolExpression = (ASTNode.SymbolExpression)Expression;
                         return fetchValueOfIdentifier(
                             tSymbolExpression.Identifier,
                             tSymbolExpression.IdentifierLower,
@@ -573,7 +573,7 @@ namespace raph.Language
                     }
                 case ASTNode.ASTType.TupleExpression:
                     {
-                        ASTNode_TupleExpression tTupleExpression = (ASTNode_TupleExpression)Expression;
+                        ASTNode.TupleExpression tTupleExpression = (ASTNode.TupleExpression)Expression;
                         return calcuTupleValue(tTupleExpression, Expression.LineNumber);
                     }
                 default:

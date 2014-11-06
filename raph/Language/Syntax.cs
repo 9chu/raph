@@ -20,8 +20,21 @@ namespace raph.Language
             3, // Minus
             2, // Mul
             2, // Div
-            1  // Power
+            1, // Power
+            4, // Greater
+            4, // Less
+            4, // GreaterEqual
+            4, // LessEqual
+            5, // Equal
+            5, // NotEqual
+            6, // LogicalAnd
+            7  // LogicalOr
         };
+
+        /// <summary>
+        /// 二元算符的最小优先级
+        /// </summary>
+        private static readonly int MaxBinaryOperatorPriority = 7;
 
         /// <summary>
         /// 匹配一个Token
@@ -91,11 +104,11 @@ namespace raph.Language
         /// </summary>
         /// <param name="Lex">词法分析器</param>
         /// <returns>语法树</returns>
-        public static ASTNode_StatementList Parse(Lexer Lex)
+        public static ASTNode.StatementList Parse(Lexer Lex)
         {
             Lex.Next();  // 预读取第一个词法单元
 
-            ASTNode_StatementList tRet = ParseStatementList(Lex);
+            ASTNode.StatementList tRet = ParseStatementList(Lex);
             if (Lex.CurrentToken != Lexer.Token.EOF)
                 throw new SyntaxException(Lex.Position, Lex.Line, Lex.Row,
                     String.Format("unexpected token {0}.", Lex.FormatCurrentToken()));
@@ -109,7 +122,7 @@ namespace raph.Language
         /// <param name="Lex">词法分析器</param>
         /// <param name="Result">解析到的语句</param>
         /// <returns>是否解析成功</returns>
-        private static bool ParseStatement(Lexer Lex, out ASTNode_Statement Result)
+        private static bool ParseStatement(Lexer Lex, out ASTNode.Statement Result)
         {
             if (Lex.CurrentToken == Lexer.Token.For)
                 Result = ParseForStatement(Lex);  // for_statement
@@ -128,10 +141,10 @@ namespace raph.Language
         /// </summary>
         /// <param name="Lex">词法分析器</param>
         /// <returns>解析结果</returns>
-        private static ASTNode_StatementList ParseStatementList(Lexer Lex)
+        private static ASTNode.StatementList ParseStatementList(Lexer Lex)
         {
-            ASTNode_StatementList tRet = new ASTNode_StatementList();
-            ASTNode_Statement tStatement;
+            ASTNode.StatementList tRet = new ASTNode.StatementList();
+            ASTNode.Statement tStatement;
             while (ParseStatement(Lex, out tStatement))
             {
                 tRet.Statements.Add(tStatement);
@@ -144,9 +157,9 @@ namespace raph.Language
         /// </summary>
         /// <param name="Lex">词法分析器</param>
         /// <returns>解析结果</returns>
-        private static ASTNode_StatementList ParseBlock(Lexer Lex)
+        private static ASTNode.StatementList ParseBlock(Lexer Lex)
         {
-            ASTNode_StatementList tRet;
+            ASTNode.StatementList tRet;
 
             if (TryMatchToken(Lex, Lexer.Token.LeftBrace))  // {
             {
@@ -158,10 +171,10 @@ namespace raph.Language
             }
             else  // 单条语句
             {
-                ASTNode_Statement tStatement;
+                ASTNode.Statement tStatement;
                 if (ParseStatement(Lex, out tStatement))
                 {
-                    tRet = new ASTNode_StatementList();
+                    tRet = new ASTNode.StatementList();
                     tRet.Statements.Add(tStatement);
                     return tRet;
                 }
@@ -176,9 +189,9 @@ namespace raph.Language
         /// </summary>
         /// <param name="Lex">词法分析器</param>
         /// <returns>解析结果</returns>
-        private static ASTNode_ArgList ParseArgList(Lexer Lex)
+        private static ASTNode.ArgList ParseArgList(Lexer Lex)
         {
-            ASTNode_ArgList tRet = new ASTNode_ArgList();
+            ASTNode.ArgList tRet = new ASTNode.ArgList();
             if (Lex.CurrentToken != Lexer.Token.RightBracket) // 非空arglist
             {
                 while (true)
@@ -201,9 +214,9 @@ namespace raph.Language
         /// </summary>
         /// <param name="Lex">词法分析器</param>
         /// <returns>解析结果</returns>
-        private static ASTNode_ForStatement ParseForStatement(Lexer Lex)
+        private static ASTNode.ForStatement ParseForStatement(Lexer Lex)
         {
-            ASTNode_ForStatement tRet = new ASTNode_ForStatement(Lex.Line);
+            ASTNode.ForStatement tRet = new ASTNode.ForStatement(Lex.Line);
 
             // for <identifier> from <expression> to <expression> {step <expression>} <block>
             MatchToken(Lex, Lexer.Token.For);
@@ -224,12 +237,12 @@ namespace raph.Language
         /// </summary>
         /// <param name="Lex">词法分析器</param>
         /// <returns>解析结果</returns>
-        private static ASTNode_Statement ParseAssignmentOrCall(Lexer Lex)
+        private static ASTNode.Statement ParseAssignmentOrCall(Lexer Lex)
         {
             string tIdentifier = MatchIdentifier(Lex);
             if (TryMatchToken(Lex, Lexer.Token.LeftBracket))  // call
             {
-                ASTNode_Call tCall = new ASTNode_Call(Lex.Line, tIdentifier, ParseArgList(Lex));
+                ASTNode.Call tCall = new ASTNode.Call(Lex.Line, tIdentifier, ParseArgList(Lex));
 
                 MatchToken(Lex, Lexer.Token.RightBracket);  // ')'
                 MatchToken(Lex, Lexer.Token.Semico);  // ';'
@@ -238,7 +251,7 @@ namespace raph.Language
             else if (TryMatchToken(Lex, Lexer.Token.Is))  // assignment
             {
                 // 读取表达式
-                ASTNode_Assignment tAssign = new ASTNode_Assignment(Lex.Line, tIdentifier, ParseExpression(Lex));
+                ASTNode.Assignment tAssign = new ASTNode.Assignment(Lex.Line, tIdentifier, ParseExpression(Lex));
 
                 MatchToken(Lex, Lexer.Token.Semico);  // ';'
                 return tAssign;
@@ -255,9 +268,9 @@ namespace raph.Language
         /// </summary>
         /// <param name="Lex">词法分析器</param>
         /// <returns>解析结果</returns>
-        private static ASTNode_Expression ParseExpression(Lexer Lex)
+        private static ASTNode.Expression ParseExpression(Lexer Lex)
         {
-            return ParseBinaryExpression(Lex, BinaryOperatorPriorityTable.Length - 1);
+            return ParseBinaryExpression(Lex, MaxBinaryOperatorPriority);
         }
 
         /// <summary>
@@ -268,14 +281,14 @@ namespace raph.Language
         /// <param name="Lex">词法分析器</param>
         /// <param name="Priority">优先级</param>
         /// <returns>解析结果</returns>
-        private static ASTNode_Expression ParseBinaryExpression(Lexer Lex, int Priority)
+        private static ASTNode.Expression ParseBinaryExpression(Lexer Lex, int Priority)
         {
             // 退化
             if (Priority == 0)
                 return ParseUnaryExpression(Lex);
 
             // 递归解析左侧的表达式
-            ASTNode_Expression tRet = ParseBinaryExpression(Lex, Priority - 1);
+            ASTNode.Expression tRet = ParseBinaryExpression(Lex, Priority - 1);
 
             // 检查是否为二元运算符
             if (Lex.CurrentToken >= Lexer.Token.Plus && (int)Lex.CurrentToken < (int)Lexer.Token.Plus + BinaryOperatorPriorityTable.Length)
@@ -284,7 +297,11 @@ namespace raph.Language
                 if (tPriority > Priority) // 优先级不符，返回
                     return tRet;
                 else
+                {
+                    // 低于左侧表达式二元算符的表达式已全部被解析，故可以安全的提升优先级。
+                    // 此时能保证 Priority >= tPriority > 左侧表达式的二元算符优先级
                     Priority = tPriority;
+                }   
             }
             else
                 return tRet;
@@ -304,10 +321,10 @@ namespace raph.Language
                 Lex.Next();
                 
                 // 获取算符右侧
-                ASTNode_Expression tRight = ParseBinaryExpression(Lex, Priority - 1);
+                ASTNode.Expression tRight = ParseBinaryExpression(Lex, Priority - 1);
                 
                 // 组合成二元AST树
-                tRet = new ASTNode_BinaryExpression(Lex.Line, BinaryOp.Plus + (tOpt - Lexer.Token.Plus), tRet, tRight);
+                tRet = new ASTNode.BinaryExpression(Lex.Line, BinaryOp.Plus + (tOpt - Lexer.Token.Plus), tRet, tRight);
             }
 
             return tRet;
@@ -318,11 +335,11 @@ namespace raph.Language
         /// </summary>
         /// <param name="Lex">词法分析器</param>
         /// <returns>解析结果</returns>
-        private static ASTNode_Expression ParseUnaryExpression(Lexer Lex)
+        private static ASTNode.Expression ParseUnaryExpression(Lexer Lex)
         {
             // 判断是否为一元表达式
             if (TryMatchToken(Lex, Lexer.Token.Minus))  // 一元负号
-                return new ASTNode_UnaryExpression(Lex.Line, UnaryOp.Negative, ParseAtomExpression(Lex));
+                return new ASTNode.UnaryExpression(Lex.Line, UnaryOp.Negative, ParseAtomExpression(Lex));
             else
                 return ParseAtomExpression(Lex);
         }
@@ -332,12 +349,30 @@ namespace raph.Language
         /// </summary>
         /// <param name="Lex">词法分析器</param>
         /// <returns>解析结果</returns>
-        private static ASTNode_Expression ParseAtomExpression(Lexer Lex)
+        private static ASTNode.Expression ParseAtomExpression(Lexer Lex)
         {
-            ASTNode_Expression tRet;
+            ASTNode.Expression tRet;
             if (Lex.CurrentToken == Lexer.Token.DigitLiteral)  // digit_literal
             {
-                tRet = new ASTNode_DigitLiteral(Lex.Line, Lex.DigitLiteral);
+                tRet = new ASTNode.DigitLiteral(Lex.Line, Lex.DigitLiteral);
+                Lex.Next();
+                return tRet;
+            }
+            else if (Lex.CurrentToken == Lexer.Token.StringLiteral)  // string_literal
+            {
+                tRet = new ASTNode.StringLiteral(Lex.Line, Lex.StringLiteral);
+                Lex.Next();
+                return tRet;
+            }
+            else if (Lex.CurrentToken == Lexer.Token.True)  // boolean_literal
+            {
+                tRet = new ASTNode.BooleanLiteral(Lex.Line, true);
+                Lex.Next();
+                return tRet;
+            }
+            else if (Lex.CurrentToken == Lexer.Token.False)  // boolean_literal
+            {
+                tRet = new ASTNode.BooleanLiteral(Lex.Line, false);
                 Lex.Next();
                 return tRet;
             }
@@ -348,12 +383,12 @@ namespace raph.Language
                 // 检查下一个符号
                 if (TryMatchToken(Lex, Lexer.Token.LeftBracket))  // '(' -- call_expression
                 {
-                    ASTNode_ArgList tArgList = ParseArgList(Lex);
+                    ASTNode.ArgList tArgList = ParseArgList(Lex);
                     MatchToken(Lex, Lexer.Token.RightBracket);  // ')'
-                    return new ASTNode_CallExpression(Lex.Line, tIdentifier, tArgList);
+                    return new ASTNode.CallExpression(Lex.Line, tIdentifier, tArgList);
                 }
                 else  // symbol
-                    return new ASTNode_SymbolExpression(Lex.Line, tIdentifier);
+                    return new ASTNode.SymbolExpression(Lex.Line, tIdentifier);
             }
             else if (TryMatchToken(Lex, Lexer.Token.LeftBracket))  // '(' -- bracket_expression
             {
@@ -374,15 +409,15 @@ namespace raph.Language
         /// </summary>
         /// <param name="Lex">词法分析器</param>
         /// <returns>解析结果</returns>
-        private static ASTNode_Expression ParseBracketExpression(Lexer Lex)
+        private static ASTNode.Expression ParseBracketExpression(Lexer Lex)
         {
             // 先读取第一个表达式
-            ASTNode_Expression tFirstExpr = ParseExpression(Lex);
+            ASTNode.Expression tFirstExpr = ParseExpression(Lex);
             
             // 检查后续元素
             if (Lex.CurrentToken != Lexer.Token.RightBracket)
             {
-                ASTNode_TupleExpression tList = new ASTNode_TupleExpression(Lex.Line);
+                ASTNode.TupleExpression tList = new ASTNode.TupleExpression(Lex.Line);
                 tList.Args.Add(tFirstExpr);
 
                 while (true)

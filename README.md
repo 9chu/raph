@@ -8,7 +8,7 @@
 
 本项目使用C#(.net 4.0)实现，raph由BR命名，取自单词graph。
 
-此外 **极度不推荐用于交作业**。
+仅限学习交流之用， **极度不推荐用于交作业** 。
 
 ### 样例
 
@@ -57,15 +57,19 @@
     block := { statement_list } | statement
     statement_list := statement_list statement | ε
     statement := assignment | call | for_statement
-    assignment := <symbol> is <expression>;
-    call := <symbol> ( <arg_list> );
-    for_statement := for <symbol> from <expression> to <expression> step <expression> <block>
+    assignment := <identifier> is <expression>;
+    call := <identifier> ( <arg_list> );
+    for_statement := for <identifier> from <expression> to <expression> step <expression> <block>
     expression := <expression> + <term_expression> | <expression> - <term_expression> | <term_expression>
+    logic_expression := <logic_expression> && <relation_expression> | <logic_expression> || <relation_expression>
+    relation_expression := <relation_expression> > <term_expression> | <relation_expression> < <term_expression> | 
+        <relation_expression> >= <term_expression> | <relation_expression> <= <term_expression> | 
+        <relation_expression> == <term_expression> | <relation_expression> != <term_expression>
     term_expression := <term_expression> * <sub_expression> | <term_expression> / <sub_expression> | <power_expression>
     power_expression := <sub_expression> ** <unary_expression> | <unary_expression>
     unary_expression := - <atom_expression> | <atom_expression>
-    atom_expression :=  ( <bracket_expression> ) | <call_expression> | <digit_literal> | <symbol>
-    call_expression := <symbol> ( <arg_list> )
+    atom_expression :=  ( <bracket_expression> ) | <call_expression> | <digit_literal> | <identifier> | <string_literal> | true | false
+    call_expression := <identifier> ( <arg_list> )
     arg_list := arg_list, expression | expression
     bracket_expression := bracket_expression , expression | expression
 ```
