@@ -125,8 +125,12 @@ namespace raph.Language
         /// <returns>是否解析成功</returns>
         private static bool ParseStatement(Lexer Lex, out ASTNode.Statement Result)
         {
-            if (Lex.CurrentToken == Lexer.Token.For)
-                Result = ParseForStatement(Lex);  // for_statement
+            if (Lex.CurrentToken == Lexer.Token.For)  // for_statement
+                Result = ParseForStatement(Lex);
+            else if (Lex.CurrentToken == Lexer.Token.While)  // while_statement
+                Result = ParseWhileStatement(Lex);
+            else if (Lex.CurrentToken == Lexer.Token.If)  // if_statement
+                Result = ParseIfStatement(Lex);
             else if (Lex.CurrentToken == Lexer.Token.Identifier)  // assignment or call
                 Result = ParseAssignmentOrCall(Lex);
             else
@@ -234,16 +238,52 @@ namespace raph.Language
         }
 
         /// <summary>
+        /// 解析While语句
+        /// </summary>
+        /// <param name="Lex">词法分析器</param>
+        /// <returns>解析结果</returns>
+        private static ASTNode.WhileStatement ParseWhileStatement(Lexer Lex)
+        {
+            int tLine = Lex.Line;
+
+            // while <expression> <block>
+            MatchToken(Lex, Lexer.Token.While);
+            ASTNode.Expression tConditionExpression = ParseExpression(Lex);
+            ASTNode.StatementList tExecBlock = ParseBlock(Lex);
+
+            return new ASTNode.WhileStatement(tConditionExpression, tExecBlock, tLine);
+        }
+        
+        /// <summary>
+        /// 解析If语句
+        /// </summary>
+        /// <param name="Lex">词法分析器</param>
+        /// <returns>解析结果</returns>
+        private static ASTNode.IfStatement ParseIfStatement(Lexer Lex)
+        {
+            // if <expr> <block> {else <block>}
+            int tLine = Lex.Line;
+            MatchToken(Lex, Lexer.Token.If);
+            ASTNode.Expression tConditionExpression = ParseExpression(Lex);
+            ASTNode.StatementList tThenBlock = ParseBlock(Lex);
+            ASTNode.StatementList tElseBlock = null;
+            if (TryMatchToken(Lex, Lexer.Token.Else))
+                tElseBlock = ParseBlock(Lex);
+            return new ASTNode.IfStatement(tConditionExpression, tThenBlock, tElseBlock, tLine);
+        }
+
+        /// <summary>
         /// 解析一条赋值或者调用指令
         /// </summary>
         /// <param name="Lex">词法分析器</param>
         /// <returns>解析结果</returns>
         private static ASTNode.Statement ParseAssignmentOrCall(Lexer Lex)
         {
+            int tLine = Lex.Line;
             string tIdentifier = MatchIdentifier(Lex);
             if (TryMatchToken(Lex, Lexer.Token.LeftBracket))  // call
             {
-                ASTNode.Call tCall = new ASTNode.Call(Lex.Line, tIdentifier, ParseArgList(Lex));
+                ASTNode.Call tCall = new ASTNode.Call(tLine, tIdentifier, ParseArgList(Lex));
 
                 MatchToken(Lex, Lexer.Token.RightBracket);  // ')'
                 MatchToken(Lex, Lexer.Token.Semico);  // ';'
@@ -251,14 +291,14 @@ namespace raph.Language
             }
             else if (TryMatchToken(Lex, Lexer.Token.Assign))  // assignment
             {
-                ASTNode.Assignment tAssign = new ASTNode.Assignment(Lex.Line, tIdentifier, ParseExpression(Lex));
+                ASTNode.Assignment tAssign = new ASTNode.Assignment(tLine, tIdentifier, ParseExpression(Lex));
 
                 MatchToken(Lex, Lexer.Token.Semico);  // ';'
                 return tAssign;
             }
             else if (TryMatchToken(Lex, Lexer.Token.Is))  // initialization
             {
-                ASTNode.Initialization tInit = new ASTNode.Initialization(Lex.Line, tIdentifier, ParseExpression(Lex));
+                ASTNode.Initialization tInit = new ASTNode.Initialization(tLine, tIdentifier, ParseExpression(Lex));
 
                 MatchToken(Lex, Lexer.Token.Semico);  // ';'
                 return tInit;
@@ -346,7 +386,9 @@ namespace raph.Language
         {
             // 判断是否为一元表达式
             if (TryMatchToken(Lex, Lexer.Token.Minus))  // 一元负号
-                return new ASTNode.UnaryExpression(Lex.Line, UnaryOp.Negative, ParseAtomExpression(Lex));
+                return new ASTNode.UnaryExpression(Lex.Line, UnaryOp.Negative, ParseUnaryExpression(Lex));
+            if (TryMatchToken(Lex, Lexer.Token.Not))  // 一元非号
+                return new ASTNode.UnaryExpression(Lex.Line, UnaryOp.Not, ParseUnaryExpression(Lex));
             else
                 return ParseAtomExpression(Lex);
         }

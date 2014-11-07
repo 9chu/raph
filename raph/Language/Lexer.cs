@@ -21,6 +21,7 @@ namespace raph.Language
             LeftBrace,       // {
             RightBrace,      // }
             Comma,           // ,
+            Not,             // !
             DigitLiteral,    // 数字字面量
             StringLiteral,   // 字符串字面量
             Identifier,      // 标识符
@@ -45,18 +46,21 @@ namespace raph.Language
             Is = 100,
             Begin,
             End,
+            If,
+            Else,
             True,
             False,
             For,
             From,
             To,
-            Step
+            Step,
+            While
         }
 
         // 关键词列表
         private static readonly string[] KeywordList = new string[]
         {
-            "is", "begin", "end", "true", "false", "for", "from", "to", "step"
+            "is", "begin", "end", "if", "else", "true", "false", "for", "from", "to", "step", "while"
         };
 
         /// <summary>
@@ -539,8 +543,7 @@ namespace raph.Language
                         _CurToken = Token.NotEqual;
                     }
                     else
-                        throw new LexcialException(_Position, _Line, _Row,
-                            String.Format("expect '=', but found '{0}'.", formatCharacter(c)));
+                        _CurToken = Token.Not;  // !
                     return;
                 case '&':
                     readNext();

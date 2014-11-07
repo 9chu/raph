@@ -18,11 +18,11 @@
     rot is pi/2;  // 旋转
 
     -- 绘图
-    for count from 1 to 3 {
+    for count from 1 to 3 begin
         rot is rot + pi / 3;
         for ang from 0 to 2*pi step pi/80
             draw(cos(ang), sin(ang));
-    }
+    end
 ```
 
 ### 词法元素
@@ -30,13 +30,13 @@
 - 关键词：
 
 ```
-    is for from to step true false
+    is begin end if else while for from to step true false while
 ```
 
 - 运算符：
 
 ```
-    + - * / ** > < >= <= == != && || =
+    + - * / ** > < >= <= == != && || = !
 ```
 
 - 分隔符：
@@ -56,11 +56,13 @@
 ```
     block := begin statement_list end | statement
     statement_list := statement_list statement | ε
-    statement := assignment | call | for_statement
+    statement := assignment | call | for_statement | while_statement | if_statement
     initialization := <identifier> is <expression>;
     assignment := <identifier> = <expression>;
     call := <identifier> ( <arg_list> );
-    for_statement := for <identifier> from <expression> to <expression> step <expression> <block>
+    for_statement := for <identifier> from <expression> to <expression> step <expression> <block> | for <identifier> from <expression> to <expression> <block>
+    if_statement := if <expression> <block> else <block> | if <expression> <block>
+    while_statement := while <expression> <block>
     expression := <logic_expression>
     logic_expression := <logic_expression> && <relation_expression> | <logic_expression> || <relation_expression>
     relation_expression := <relation_expression> > <assign_expression> | <relation_expression> < <assign_expression> | 

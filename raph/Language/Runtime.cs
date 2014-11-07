@@ -485,6 +485,40 @@ namespace raph.Language
                             }
                         }
                         break;
+                    case ASTNode.ASTType.WhileStatement:
+                        {
+                            ASTNode.WhileStatement tWhileStatement = (ASTNode.WhileStatement)s;
+                            while (true)
+                            {
+                                RuntimeValue tTest = execExpressionAST(Context, tWhileStatement.ConditionExpression);
+                                if (tTest.ValueType != RuntimeValueType.Boolean)
+                                    throw new RuntimeException(tWhileStatement.ConditionExpression.LineNumber,
+                                        String.Format("the result of while condition expression must be a boolean."));
+                                RuntimeValue.Boolean tBoolean = (RuntimeValue.Boolean)tTest;
+                                if (tBoolean.Value)
+                                    execBlockAST(Context, tWhileStatement.ExecBlock);
+                                else
+                                    break;
+                            }
+                        }
+                        break;
+                    case ASTNode.ASTType.IfStatement:
+                        {
+                            ASTNode.IfStatement tIfStatement = (ASTNode.IfStatement)s;
+                            RuntimeValue tTest = execExpressionAST(Context, tIfStatement.ConditionExpression);
+                            if (tTest.ValueType != RuntimeValueType.Boolean)
+                                throw new RuntimeException(tIfStatement.ConditionExpression.LineNumber,
+                                    String.Format("the result of if condition expression must be a boolean."));
+                            RuntimeValue.Boolean tBoolean = (RuntimeValue.Boolean)tTest;
+                            if (tBoolean.Value)  // then
+                                execBlockAST(Context, tIfStatement.ThenBlock);
+                            else
+                            {
+                                if (tIfStatement.ElseBlock != null)  // else
+                                    execBlockAST(Context, tIfStatement.ElseBlock);
+                            }
+                        }
+                        break;
                     default:
                         throw new RuntimeException(s.LineNumber, "internal error, current syntax not implemented.");
                 }

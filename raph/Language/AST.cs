@@ -32,7 +32,8 @@ namespace raph.Language
     /// </summary>
     public enum UnaryOp
     {
-        Negative
+        Negative,
+        Not
     }
 
     public abstract class ASTNode
@@ -51,6 +52,8 @@ namespace raph.Language
             Assignment,
             Call,
             ForStatement,
+            WhileStatement,
+            IfStatement,
 
             // 表达式组成成分
             BinaryExpression,
@@ -332,6 +335,95 @@ namespace raph.Language
             public ForStatement(int LineNum)
                 : base(ASTType.ForStatement, LineNum) { }
         }
+
+        public class WhileStatement : Statement
+        {
+            private Expression _ConditionExpression = null;
+            private StatementList _ExecBlock = null;
+
+            public Expression ConditionExpression
+            {
+                get
+                {
+                    return _ConditionExpression;
+                }
+                set
+                {
+                    _ConditionExpression = value;
+                }
+            }
+            
+            public StatementList ExecBlock
+            {
+                get
+                {
+                    return _ExecBlock;
+                }
+                set
+                {
+                    _ExecBlock = value;
+                }
+            }
+
+            public WhileStatement(Expression ConditionExpr, StatementList Block, int LineNum)
+                : base(ASTType.WhileStatement, LineNum)
+            {
+                _ConditionExpression = ConditionExpr;
+                _ExecBlock = Block;
+            }
+        }
+
+        public class IfStatement : Statement
+        {
+            private Expression _ConditionExpression = null;
+            private StatementList _ThenBlock = null;
+            private StatementList _ElseBlock = null;
+
+            public Expression ConditionExpression
+            {
+                get
+                {
+                    return _ConditionExpression;
+                }
+                set
+                {
+                    _ConditionExpression = value;
+                }
+            }
+
+            public StatementList ThenBlock
+            {
+                get
+                {
+                    return _ThenBlock;
+                }
+                set
+                {
+                    _ThenBlock = value;
+                }
+            }
+
+            public StatementList ElseBlock
+            {
+                get
+                {
+                    return _ElseBlock;
+                }
+                set
+                {
+                    _ElseBlock = value;
+                }
+            }
+
+            public IfStatement(Expression Condition, StatementList Then, StatementList Else, int LineNum)
+                : base(ASTType.IfStatement, LineNum)
+            {
+                _ConditionExpression = Condition;
+                _ThenBlock = Then;
+                _ElseBlock = Else;
+            }
+        }
+
         public class ArgList : ASTNode
         {
             private List<Expression> _Args = new List<Expression>();

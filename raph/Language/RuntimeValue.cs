@@ -235,6 +235,14 @@ namespace raph.Language
                 }
             }
 
+            public override RuntimeValue ApplyUnaryOperator(UnaryOp OperatorType)
+            {
+                if (OperatorType == UnaryOp.Not)
+                    return new Boolean(!_Value);
+
+                return base.ApplyUnaryOperator(OperatorType);
+            }
+
             public override RuntimeValue ApplyBinaryOperator(BinaryOp OperatorType, RuntimeValue RightValueRef)
             {
                 if (RightValueRef.ValueType == RuntimeValueType.Boolean)
