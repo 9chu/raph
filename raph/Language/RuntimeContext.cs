@@ -49,8 +49,30 @@ namespace raph.Language
             }
             set
             {
-                _Parent[IdentifierLower] = value;
+                if (_Environment.ContainsKey(IdentifierLower))
+                    _Environment[IdentifierLower] = value;
+                else
+                {
+                    if (_Parent != null)
+                        _Parent[IdentifierLower] = value;
+                    else
+                        throw new KeyNotFoundException();
+                }
             }
+        }
+
+        /// <summary>
+        /// 在当前环境中设置一个值
+        /// </summary>
+        /// <remarks>若已存在定义则覆盖</remarks>
+        /// <param name="IdentifierLower">标识符小写形式</param>
+        /// <param name="Value">欲存放的值</param>
+        public void Set(string IdentifierLower, RuntimeValue Value)
+        {
+            if (_Environment.ContainsKey(IdentifierLower))
+                _Environment[IdentifierLower] = Value;
+            else
+                _Environment.Add(IdentifierLower, Value);
         }
 
         /// <summary>
@@ -58,7 +80,7 @@ namespace raph.Language
         /// </summary>
         /// <param name="IdentifierLower">标识符小写形式</param>
         /// <returns>是否成功移除</returns>
-        public bool RemoveValue(string IdentifierLower)
+        public bool Remove(string IdentifierLower)
         {
             return _Environment.Remove(IdentifierLower);
         }
@@ -93,6 +115,36 @@ namespace raph.Language
                 Owner = null;
                 return false;
             }
+        }
+
+        /// <summary>
+        /// 注册值
+        /// </summary>
+        /// <param name="Identifier">标识符</param>
+        /// <param name="Value">值</param>
+        public void Register(string Identifier, RuntimeValue Value)
+        {
+            Set(Identifier.ToLower(), Value);
+        }
+
+        /// <summary>
+        /// 注册数值
+        /// </summary>
+        /// <param name="Identifier">标识符</param>
+        /// <param name="Value">值</param>
+        public void Register(string Identifier, double Value)
+        {
+            Set(Identifier.ToLower(), new RuntimeValue.Digit(Value));
+        }
+
+        /// <summary>
+        /// 注册外部函数
+        /// </summary>
+        /// <param name="Identifier">标识符</param>
+        /// <param name="ExtFunction">值</param>
+        public void Register(string Identifier, ExternalFunctionHandler ExtFunction, int ArgCount = -1)
+        {
+            Set(Identifier.ToLower(), new RuntimeValue.ExternalFunction(ExtFunction, ArgCount));
         }
 
         public RuntimeContext(RuntimeContext Parent)

@@ -30,13 +30,13 @@
 - 关键词：
 
 ```
-    is for from to step
+    is for from to step true false
 ```
 
 - 运算符：
 
 ```
-    + - * / **
+    + - * / ** > < >= <= == != && || =
 ```
 
 - 分隔符：
@@ -54,17 +54,20 @@
 ### 语法范式
 
 ```
-    block := { statement_list } | statement
+    block := begin statement_list end | statement
     statement_list := statement_list statement | ε
     statement := assignment | call | for_statement
-    assignment := <identifier> is <expression>;
+    initialization := <identifier> is <expression>;
+    assignment := <identifier> = <expression>;
     call := <identifier> ( <arg_list> );
     for_statement := for <identifier> from <expression> to <expression> step <expression> <block>
-    expression := <expression> + <term_expression> | <expression> - <term_expression> | <term_expression>
+    expression := <logic_expression>
     logic_expression := <logic_expression> && <relation_expression> | <logic_expression> || <relation_expression>
-    relation_expression := <relation_expression> > <term_expression> | <relation_expression> < <term_expression> | 
-        <relation_expression> >= <term_expression> | <relation_expression> <= <term_expression> | 
-        <relation_expression> == <term_expression> | <relation_expression> != <term_expression>
+    relation_expression := <relation_expression> > <assign_expression> | <relation_expression> < <assign_expression> | 
+        <relation_expression> >= <assign_expression> | <relation_expression> <= <assign_expression> | 
+        <relation_expression> == <assign_expression> | <relation_expression> != <assign_expression> | <assign_expression>
+    assign_expression := <assign_expression> = <plusminus_expression> | <plusminus_expression>
+    plusminus_expression := <plusminus_expression> + <term_expression> | <plusminus_expression> - <term_expression> | <term_expression>
     term_expression := <term_expression> * <sub_expression> | <term_expression> / <sub_expression> | <power_expression>
     power_expression := <sub_expression> ** <unary_expression> | <unary_expression>
     unary_expression := - <atom_expression> | <atom_expression>

@@ -29,7 +29,6 @@ namespace raph.Language
     /// <summary>
     /// 运行时值对象
     /// </summary>
-    /// <remarks>以下异常将被特别对待：NotSupportedException</remarks>
     public abstract class RuntimeValue
     {
         private RuntimeValueType _ValueType;
@@ -52,7 +51,7 @@ namespace raph.Language
         /// <returns>返回新值</returns>
         public virtual RuntimeValue ApplyUnaryOperator(UnaryOp OperatorType)
         {
-            throw new NotSupportedException();
+            throw new OperationNotSupport();
         }
 
         /// <summary>
@@ -79,7 +78,7 @@ namespace raph.Language
                 return new Tuple(t);
             }
 
-            throw new NotSupportedException();
+            throw new OperationNotSupport();
         }
 
         /// <summary>
@@ -90,7 +89,7 @@ namespace raph.Language
         /// <returns>返回值</returns>
         public virtual RuntimeValue ApplyCallOperator(RuntimeContext Context, RuntimeValue[] Args)
         {
-            throw new NotSupportedException();
+            throw new OperationNotSupport();
         }
 
         /// <summary>
@@ -114,7 +113,7 @@ namespace raph.Language
                 case RuntimeValueType.String:
                     return "string";
                 default:
-                    throw new NotImplementedException();
+                    return "unknown";
             }
         }
 
@@ -125,6 +124,41 @@ namespace raph.Language
         public virtual string DataToString()
         {
             return System.String.Format("<{0}>", TypeToString());
+        }
+
+        /// <summary>
+        /// 类型转换
+        /// </summary>
+        /// <typeparam name="T">目标类型</typeparam>
+        /// <returns>转换结果</returns>
+        public T CastTo<T>()
+        {
+            if (typeof(T) == typeof(bool))
+            {
+                if (ValueType != RuntimeValueType.Boolean)
+                    throw new InvalidCastException(
+                        System.String.Format("can't cast type {0} to boolean.", TypeToString()));
+                Boolean tDigit = (Boolean)this;
+                return (T)(object)tDigit.Value;
+            }
+            else if (typeof(T) == typeof(double))
+            {
+                if (ValueType != RuntimeValueType.Digit)
+                    throw new InvalidCastException(
+                        System.String.Format("can't cast type {0} to digit.", TypeToString()));
+                Digit tDigit = (Digit)this;
+                return (T)(object)tDigit.Value;
+            }
+            else if (typeof(T) == typeof(string))
+            {
+                if (ValueType != RuntimeValueType.String)
+                    throw new InvalidCastException(
+                        System.String.Format("can't cast type {0} to string.", TypeToString()));
+                String tString = (String)this;
+                return (T)(object)tString.Value;
+            }
+            else
+                throw new InvalidCastException("bad cast operation.");
         }
 
         public RuntimeValue(RuntimeValueType ValueType)
@@ -148,6 +182,7 @@ namespace raph.Language
         public class ExternalFunction : RuntimeValue
         {
             private ExternalFunctionHandler _Value;
+            private int _ArgCount;
 
             public ExternalFunctionHandler Value
             {
@@ -155,16 +190,29 @@ namespace raph.Language
                 {
                     return _Value;
                 }
-                set
+            }
+
+            public int ArgCount
+            {
+                get
                 {
-                    _Value = value;
+                    return _ArgCount;
                 }
             }
 
-            public ExternalFunction(ExternalFunctionHandler Value)
+            public override RuntimeValue ApplyCallOperator(RuntimeContext Context, RuntimeValue[] Args)
+            {
+                if (_ArgCount >= 0 && _ArgCount != Args.Length)
+                    throw new ArgumentCountMismatch(_ArgCount, Args.Length);
+
+                return _Value(Context, Args);
+            }
+
+            public ExternalFunction(ExternalFunctionHandler Value, int ArgCount = -1)
                 : base(RuntimeValueType.ExternalFunction)
             {
                 _Value = Value;
+                _ArgCount = ArgCount;
             }
         }
 
@@ -312,7 +360,7 @@ namespace raph.Language
                 {
                     Tuple r = (Tuple)RightValueRef;
                     if (Value.Length != r.Value.Length)
-                        throw new NotSupportedException();
+                        throw new OperationNotSupport();
                     RuntimeValue[] t = new RuntimeValue[Value.Length];
                     for (int i = 0; i < t.Length; ++i)
                     {

@@ -23,7 +23,8 @@ namespace raph.Language
         Equal,
         NotEqual,
         LogicalAnd,
-        LogicalOr
+        LogicalOr,
+        Assign
     }
 
     /// <summary>
@@ -45,10 +46,13 @@ namespace raph.Language
             StatementList,
             ArgList,
 
+            // 语句块组成成分
+            Initialization,
             Assignment,
             Call,
             ForStatement,
 
+            // 表达式组成成分
             BinaryExpression,
             UnaryExpression,
             DigitLiteral,
@@ -104,6 +108,53 @@ namespace raph.Language
         {
             public Statement(ASTType AType, int LineNum)
                 : base(AType, LineNum) { }
+        }
+
+        public class Initialization : Statement
+        {
+            private string _Identifier = String.Empty;
+            private string _IdentifierLower = String.Empty;
+            private Expression _Expression = null;
+
+            public string Identifier
+            {
+                get
+                {
+                    return _Identifier;
+                }
+                set
+                {
+                    _Identifier = value;
+                    _IdentifierLower = _Identifier.ToLower();
+                }
+            }
+
+            public string IdentifierLower
+            {
+                get
+                {
+                    return _IdentifierLower;
+                }
+            }
+
+            public Expression AssignmentExpression
+            {
+                get
+                {
+                    return _Expression;
+                }
+                set
+                {
+                    _Expression = value;
+                }
+            }
+
+            public Initialization(int LineNum, string Id, Expression Expr)
+                : base(ASTType.Initialization, LineNum)
+            {
+                Identifier = Id;
+                AssignmentExpression = Expr;
+            }
         }
 
         public class Assignment : Statement

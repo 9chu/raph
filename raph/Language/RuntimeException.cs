@@ -41,4 +41,40 @@ namespace raph.Language
             _Description = Description;
         }
     }
+
+    /// <summary>
+    /// 操作不支持
+    /// </summary>
+    public class OperationNotSupport : Exception { }
+
+    /// <summary>
+    /// 参数数量不匹配
+    /// </summary>
+    public class ArgumentCountMismatch : Exception
+    {
+        private int _ArgumentGiven = 0;
+        private int _ArgumentRequired = 0;
+
+        public int ArgumentGiven
+        {
+            get
+            {
+                return _ArgumentGiven;
+            }
+        }
+
+        public int ArgumentRequired
+        {
+            get
+            {
+                return _ArgumentRequired;
+            }
+        }
+
+        public ArgumentCountMismatch(int iArgumentRequired, int iArgumentGiven)
+        {
+            _ArgumentGiven = iArgumentGiven;
+            _ArgumentRequired = iArgumentRequired;
+        }
+    }
 }

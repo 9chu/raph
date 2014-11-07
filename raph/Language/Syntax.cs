@@ -21,20 +21,21 @@ namespace raph.Language
             2, // Mul
             2, // Div
             1, // Power
-            4, // Greater
-            4, // Less
-            4, // GreaterEqual
-            4, // LessEqual
-            5, // Equal
-            5, // NotEqual
-            6, // LogicalAnd
-            7  // LogicalOr
+            5, // Greater
+            5, // Less
+            5, // GreaterEqual
+            5, // LessEqual
+            6, // Equal
+            6, // NotEqual
+            7, // LogicalAnd
+            8, // LogicalOr
+            4  // Assign
         };
 
         /// <summary>
         /// 二元算符的最小优先级
         /// </summary>
-        private static readonly int MaxBinaryOperatorPriority = 7;
+        private static readonly int MaxBinaryOperatorPriority = 8;
 
         /// <summary>
         /// 匹配一个Token
@@ -161,11 +162,11 @@ namespace raph.Language
         {
             ASTNode.StatementList tRet;
 
-            if (TryMatchToken(Lex, Lexer.Token.LeftBrace))  // {
+            if (TryMatchToken(Lex, Lexer.Token.Begin))  // begin
             {
                 tRet = ParseStatementList(Lex);
 
-                MatchToken(Lex, Lexer.Token.RightBrace);  // }
+                MatchToken(Lex, Lexer.Token.End);  // end
 
                 return tRet;
             }
@@ -248,13 +249,19 @@ namespace raph.Language
                 MatchToken(Lex, Lexer.Token.Semico);  // ';'
                 return tCall;
             }
-            else if (TryMatchToken(Lex, Lexer.Token.Is))  // assignment
+            else if (TryMatchToken(Lex, Lexer.Token.Assign))  // assignment
             {
-                // 读取表达式
                 ASTNode.Assignment tAssign = new ASTNode.Assignment(Lex.Line, tIdentifier, ParseExpression(Lex));
 
                 MatchToken(Lex, Lexer.Token.Semico);  // ';'
                 return tAssign;
+            }
+            else if (TryMatchToken(Lex, Lexer.Token.Is))  // initialization
+            {
+                ASTNode.Initialization tInit = new ASTNode.Initialization(Lex.Line, tIdentifier, ParseExpression(Lex));
+
+                MatchToken(Lex, Lexer.Token.Semico);  // ';'
+                return tInit;
             }
             else
                 throw new SyntaxException(Lex.Position, Lex.Line, Lex.Row,

@@ -24,6 +24,17 @@ namespace raph
         public event OnRuntimeExceptionHandler OnRuntimeException;
         public event OnOutputTextHandler OnOutputText;
 
+        private void castTuple2ToFloat2(RuntimeValue Input, out double X, out double Y)
+        {
+            if (Input.ValueType != RuntimeValueType.Tuple)
+                throw new ArgumentException();
+            RuntimeValue.Tuple tTuple = (RuntimeValue.Tuple)Input;
+            if (tTuple.Value.Length != 2)
+                throw new ArgumentException();
+            X = tTuple.Value[0].CastTo<double>();
+            Y = tTuple.Value[1].CastTo<double>();
+        }
+
         /// <summary>
         /// 目标缓冲区
         /// </summary>
@@ -39,7 +50,7 @@ namespace raph
         {
             try
             {
-                _Runtime.ExecBlock(Block);
+                _Runtime.ExecAST(Block);
             }
             catch (RuntimeException e)
             {
@@ -52,28 +63,53 @@ namespace raph
 
         public PaintRuntime()
         {
+            RuntimeContext tContext = _Runtime.RootContext;
+
+            // 注册常量
+            tContext.Register("origin", new RuntimeValue.Tuple(new RuntimeValue[] { new RuntimeValue.Digit(0), new RuntimeValue.Digit(0) }));
+            tContext.Register("scale", new RuntimeValue.Tuple(new RuntimeValue[] { new RuntimeValue.Digit(1), new RuntimeValue.Digit(1) }));
+            tContext.Register("rot", 0.0);
+
             // 注册函数
-            _Runtime.RegisterIdentifier("print", (Runtime.NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
+            tContext.Register("print", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
             {
-                foreach (object o in Args)
+                foreach (RuntimeValue o in Args)
                 {
                     if (OnOutputText != null)
-                        OnOutputText(this, o.ToString());
+                        OnOutputText(this, o.DataToString());
+                }
+                return new RuntimeValue.None();
+            });
+            tContext.Register("draw", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
+            {
+                double tX = Args[0].CastTo<double>();
+                double tY = Args[1].CastTo<double>();
+
+                double tOriginX, tOriginY;
+                double tScaleX, tScaleY;
+                double tRotation = Context["rot"].CastTo<double>();
+
+                // 获取环境变量
+                try
+                {
+                    castTuple2ToFloat2(Context["origin"], out tOriginX, out tOriginY);
+                }
+                catch (ArgumentException)
+                {
+                    throw new InvalidCastException("local var \"origin\" must be a tuple(2).");
+                }
+                try
+                {
+                    castTuple2ToFloat2(Context["scale"], out tScaleX, out tScaleY);
+                }
+                catch (ArgumentException)
+                {
+                    throw new InvalidCastException("local var \"scale\" must be a tuple(2).");
                 }
 
-                return new Language.Runtime.None();
-            });
-            _Runtime.RegisterIdentifier("draw", (Runtime.NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                Runtime.ArgCountCheckHelper("draw", Args, 2, LineNumber);
-                double tX = Runtime.ArgCheckHelper<double>("draw", Args, 0, LineNumber);
-                double tY = Runtime.ArgCheckHelper<double>("draw", Args, 1, LineNumber);
-
-                Runtime.Vector2 tOrigin = Context.FetchIdentifier<Runtime.Vector2>("origin");
-                Runtime.Vector2 tScale = Context.FetchIdentifier<Runtime.Vector2>("scale");
-                double tRotation = Context.FetchIdentifier<double>("rot");
-                tX *= tScale.x;
-                tY *= tScale.y;
+                // 计算
+                tX *= tScaleX;
+                tY *= tScaleY;
                 if (tRotation != 0)
                 {
                     double tAfterRotX = tX * Math.Cos(tRotation) + tY * Math.Sin(tRotation);
@@ -81,50 +117,37 @@ namespace raph
                     tX = tAfterRotX;
                     tY = tAfterRotY;
                 }
-                tX += tOrigin.x;
-                tY += tOrigin.y;
+                tX += tOriginX;
+                tY += tOriginY;
 
                 if (!(tX >= _TargetBuffer.Width || tX < 0 || tY < 0 || tY >= _TargetBuffer.Height))
-                {
                     _TargetBuffer.SetPixel((int)tX, (int)tY, _PixelColor);
-                }
-                return new Runtime.None();
-            });
-            _Runtime.RegisterIdentifier("setPixelAlpha", (Runtime.NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
+                return new RuntimeValue.None();
+            }, 2);
+            tContext.Register("setPixelAlpha", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
             {
-                Runtime.ArgCountCheckHelper("setPixelAlpha", Args, 1, LineNumber);
-                double tArg = Runtime.ArgCheckHelper<double>("setPixelAlpha", Args, 0, LineNumber);
-
+                double tArg = Args[0].CastTo<double>();
                 _PixelColor = Color.FromArgb((byte)Math.Min(tArg, 255), _PixelColor.R, _PixelColor.G, _PixelColor.B);
-                return new Runtime.None();
-            });
-            _Runtime.RegisterIdentifier("setPixelRed", (Runtime.NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
+                return new RuntimeValue.None();
+            }, 1);
+            tContext.Register("setPixelRed", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
             {
-                Runtime.ArgCountCheckHelper("setPixelRed", Args, 1, LineNumber);
-                double tArg = Runtime.ArgCheckHelper<double>("setPixelRed", Args, 0, LineNumber);
-
+                double tArg = Args[0].CastTo<double>();
                 _PixelColor = Color.FromArgb(_PixelColor.A, (byte)Math.Min(tArg, 255), _PixelColor.G, _PixelColor.B);
-                return new Runtime.None();
-            });
-            _Runtime.RegisterIdentifier("setPixelGreen", (Runtime.NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
+                return new RuntimeValue.None();
+            }, 1);
+            tContext.Register("setPixelGreen", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
             {
-                Runtime.ArgCountCheckHelper("setPixelGreen", Args, 1, LineNumber);
-                double tArg = Runtime.ArgCheckHelper<double>("setPixelGreen", Args, 0, LineNumber);
-
+                double tArg = Args[0].CastTo<double>();
                 _PixelColor = Color.FromArgb(_PixelColor.A, _PixelColor.R, (byte)Math.Min(tArg, 255), _PixelColor.B);
-                return new Runtime.None();
-            });
-            _Runtime.RegisterIdentifier("setPixelBlue", (Runtime.NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
+                return new RuntimeValue.None();
+            }, 1);
+            tContext.Register("setPixelBlue", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
             {
-                Runtime.ArgCountCheckHelper("setPixelBlue", Args, 1, LineNumber);
-                double tArg = Runtime.ArgCheckHelper<double>("setPixelBlue", Args, 0, LineNumber);
-
+                double tArg = Args[0].CastTo<double>();
                 _PixelColor = Color.FromArgb(_PixelColor.A, _PixelColor.R, _PixelColor.G, (byte)Math.Min(tArg, 255));
-                return new Runtime.None();
-            });
-            _Runtime.RegisterIdentifier("origin", new Runtime.Vector2 { x = 0, y = 0 });
-            _Runtime.RegisterIdentifier("scale", new Runtime.Vector2 { x = 1, y = 1 });
-            _Runtime.RegisterIdentifier("rot", 0.0);
+                return new RuntimeValue.None();
+            }, 1);
         }
     }
 }

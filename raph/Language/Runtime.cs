@@ -10,736 +10,499 @@ namespace raph.Language
     /// </summary>
     public class Runtime
     {
-        /// <summary>
-        /// 空类型
-        /// </summary>
-        public struct None {}
+        private static readonly RuntimeValue[] EmptyArgs = new RuntimeValue[0];
+        private static readonly RuntimeValue DefaultForStepSize = new RuntimeValue.Digit(1);
+        private static readonly RuntimeValue DefaultForStepSizeReverse = new RuntimeValue.Digit(-1);
+
+        private RuntimeContext _RootContext = new RuntimeContext(null);
 
         /// <summary>
-        /// 二维向量类型
+        /// 根执行环境
         /// </summary>
-        public struct Vector2
+        public RuntimeContext RootContext
         {
-            public double x;
-            public double y;
-
-            public override string ToString()
+            get
             {
-                return String.Format("({0}, {1})", x, y);
+                return _RootContext;
             }
         }
 
-        /// <summary>
-        /// 本地调用处理函数
-        /// </summary>
-        /// <param name="Context">运行时</param>
-        /// <param name="Args">参数</param>
-        /// <param name="LineNumber">执行操作所在的行数</param>
-        /// <returns>执行结果，若为None类型则表示无返回值</returns>
-        public delegate object NativeCallHandler(Runtime Context, object[] Args, int LineNumber);
-
-        /// <summary>
-        /// 参数辅助检查
-        /// </summary>
-        /// <typeparam name="T">目标类型</typeparam>
-        /// <param name="FuncName">函数名</param>
-        /// <param name="Args">参数列表</param>
-        /// <param name="ArgIndex">下标</param>
-        /// <param name="LineNumber">行号</param>
-        /// <returns>目标类型值</returns>
-        public static T ArgCheckHelper<T>(string FuncName, object[] Args, int ArgIndex, int LineNumber)
+        // 初始化根执行环境
+        // 对内置常量、函数进行初始化
+        private void initRootContext()
         {
-            if (ArgIndex >= Args.Length || ArgIndex < 0)
-                throw new RuntimeException(LineNumber, String.Format("{0}: insufficient args.", FuncName));
-            else if (!(Args[ArgIndex] is T))
-                throw new RuntimeException(LineNumber, String.Format("{0}: type of arg {1} dismatched.", FuncName, ArgIndex));
-            else
-                return (T)Args[ArgIndex];
-        }
+            RootContext.Register("pi", Math.PI);
+            RootContext.Register("e", Math.E);
 
-        /// <summary>
-        /// 参数数量检测辅助函数
-        /// </summary>
-        /// <param name="FuncName">函数名</param>
-        /// <param name="Args">参数列表</param>
-        /// <param name="ArgCount">需要的参数数量</param>
-        /// <param name="LineNumber">行号</param>
-        public static void ArgCountCheckHelper(string FuncName, object[] Args, int ArgCount, int LineNumber)
-        {
-            if (ArgCount != Args.Length)
-                throw new RuntimeException(LineNumber, String.Format("{0}: insufficient args, {1} arg(s) needed.", FuncName, ArgCount));
-        }
-
-        private Dictionary<string, object> _Environment = new Dictionary<string, object>();
-        
-        // 计算二元运算
-        private object applyBinaryOperator(BinaryOp Operator, object Left, object Right, int LineNumber)
-        {
-            switch (Operator)
+            // === func(digit)->digit 形式 ===
+            string[] MathFuncName = new string[] {
+                "sin", "cos", "tan", 
+                "sinh", "cosh", "tanh",
+                "asin", "acos", "atan",
+                "exp", "ln", "log10",
+                "sqrt", "abs",
+                "round", "trunc",
+                "floor", "ceil"
+            };
+            Func<double, double>[] MathFuncList = new Func<double,double>[] {
+                Math.Sin, Math.Cos, Math.Tan,
+                Math.Sinh, Math.Cosh, Math.Tanh,
+                Math.Asin, Math.Acos, Math.Atan,
+                Math.Exp, Math.Log, Math.Log10,
+                Math.Sqrt, Math.Abs,
+                Math.Round, Math.Truncate,
+                Math.Floor, Math.Ceiling
+            };
+            for (int i = 0; i < MathFuncName.Length; ++i)
             {
-                case BinaryOp.Plus:
-                    if (Left is double)
-                    {
-                        if (Right is double)
-                            return (double)Left + (double)Right;
-                        else
-                            throw new RuntimeException(LineNumber, 
-                                String.Format("can't perform plus operator on type {0}.", Right.GetType().ToString()));
-                    }
-                    else if (Left is Vector2)
-                    {
-                        if (Right is Vector2)
-                        {
-                            Vector2 tOrg = (Vector2)Left;
-                            tOrg.x += ((Vector2)Right).x;
-                            tOrg.y += ((Vector2)Right).y;
-                            return tOrg;
-                        }
-                        else
-                            throw new RuntimeException(LineNumber,
-                                String.Format("can't perform plus operator on type {0}.", Right.GetType().ToString()));
-                    }
-                    else
-                        throw new RuntimeException(LineNumber,
-                            String.Format("can't perform plus operator on type {0}.", Left.GetType().ToString()));
-                case BinaryOp.Minus:
-                    if (Left is double)
-                    {
-                        if (Right is double)
-                            return (double)Left - (double)Right;
-                        else
-                            throw new RuntimeException(LineNumber,
-                                String.Format("can't perform minus operator on type {0}.", Right.GetType().ToString()));
-                    }
-                    else if (Left is Vector2)
-                    {
-                        if (Right is Vector2)
-                        {
-                            Vector2 tOrg = (Vector2)Left;
-                            tOrg.x -= ((Vector2)Right).x;
-                            tOrg.y -= ((Vector2)Right).y;
-                            return tOrg;
-                        }
-                        else
-                            throw new RuntimeException(LineNumber,
-                                String.Format("can't perform minus operator on type {0}.", Right.GetType().ToString()));
-                    }
-                    else
-                        throw new RuntimeException(LineNumber,
-                            String.Format("can't perform minus operator on type {0}.", Left.GetType().ToString()));
-                case BinaryOp.Mul:
-                    if (Left is double)
-                    {
-                        if (Right is double)
-                            return (double)Left * (double)Right;
-                        else if (Right is Vector2)
-                        {
-                            Vector2 tOrg = (Vector2)Right;
-                            tOrg.x *= (double)Left;
-                            tOrg.y *= (double)Left;
-                            return tOrg;
-                        }
-                        else
-                            throw new RuntimeException(LineNumber,
-                                String.Format("can't perform mul operator on type {0}.", Right.GetType().ToString()));
-                    }
-                    else if (Left is Vector2)
-                    {
-                        if (Right is double)
-                        {
-                            Vector2 tOrg = (Vector2)Left;
-                            tOrg.x *= (double)Right;
-                            tOrg.y *= (double)Right;
-                            return tOrg;
-                        }
-                        else if (Right is Vector2)
-                        {
-                            Vector2 tOrg = (Vector2)Left;
-                            tOrg.x *= ((Vector2)Right).x;
-                            tOrg.y *= ((Vector2)Right).y;
-                            return tOrg;
-                        }
-                        else
-                            throw new RuntimeException(LineNumber,
-                                String.Format("can't perform mul operator on type {0}.", Right.GetType().ToString()));
-                    }
-                    else
-                        throw new RuntimeException(LineNumber,
-                            String.Format("can't perform mul operator on type {0}.", Left.GetType().ToString()));
-                case BinaryOp.Div:
-                    if (Left is double)
-                    {
-                        if (Right is double)
-                            return (double)Left / (double)Right;
-                        else if (Right is Vector2)
-                        {
-                            Vector2 tOrg = (Vector2)Right;
-                            tOrg.x = (double)Left / tOrg.x;
-                            tOrg.y = (double)Left / tOrg.y;
-                            return tOrg;
-                        }
-                        else
-                            throw new RuntimeException(LineNumber,
-                                String.Format("can't perform div operator on type {0}.", Right.GetType().ToString()));
-                    }
-                    else if (Left is Vector2)
-                    {
-                        if (Right is double)
-                        {
-                            Vector2 tOrg = (Vector2)Left;
-                            tOrg.x /= (double)Right;
-                            tOrg.y /= (double)Right;
-                            return tOrg;
-                        }
-                        else if (Right is Vector2)
-                        {
-                            Vector2 tOrg = (Vector2)Left;
-                            tOrg.x /= ((Vector2)Right).x;
-                            tOrg.y /= ((Vector2)Right).y;
-                            return tOrg;
-                        }
-                        else
-                            throw new RuntimeException(LineNumber,
-                                String.Format("can't perform div operator on type {0}.", Right.GetType().ToString()));
-                    }
-                    else
-                        throw new RuntimeException(LineNumber,
-                            String.Format("can't perform div operator on type {0}.", Left.GetType().ToString()));
-                case BinaryOp.Power:
-                    if (Left is double)
-                    {
-                        if (Right is double)
-                            return Math.Pow((double)Left, (double)Right);
-                        else if (Right is Vector2)
-                        {
-                            Vector2 tOrg = (Vector2)Right;
-                            tOrg.x = Math.Pow((double)Left, tOrg.x);
-                            tOrg.y = Math.Pow((double)Left, tOrg.y);
-                            return tOrg;
-                        }
-                        else
-                            throw new RuntimeException(LineNumber,
-                                String.Format("can't perform mul operator on type {0}.", Right.GetType().ToString()));
-                    }
-                    else if (Left is Vector2)
-                    {
-                        if (Right is double)
-                        {
-                            Vector2 tOrg = (Vector2)Left;
-                            tOrg.x = Math.Pow(tOrg.x, (double)Right);
-                            tOrg.y = Math.Pow(tOrg.y, (double)Right);
-                            return tOrg;
-                        }
-                        else if (Right is Vector2)
-                        {
-                            Vector2 tOrg = (Vector2)Left;
-                            tOrg.x = Math.Pow(tOrg.x, ((Vector2)Right).x);
-                            tOrg.y = Math.Pow(tOrg.y, ((Vector2)Right).y);
-                            return tOrg;
-                        }
-                        else
-                            throw new RuntimeException(LineNumber,
-                                String.Format("can't perform mul operator on type {0}.", Right.GetType().ToString()));
-                    }
-                    else
-                        throw new RuntimeException(LineNumber,
-                            String.Format("can't perform mul operator on type {0}.", Left.GetType().ToString()));
-                default:
-                    throw new RuntimeException(LineNumber, "internal error.");
+                Func<double, double> tFunc = MathFuncList[i];
+                RootContext.Register(MathFuncName[i], (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
+                {
+                    return new RuntimeValue.Digit(tFunc(Args[0].CastTo<double>()));
+                }, 1);
             }
+
+            // === 其他类型func ===
+            RootContext.Register("atan2", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
+            {
+                return new RuntimeValue.Digit(Math.Atan2(Args[0].CastTo<double>(), Args[1].CastTo<double>()));
+            }, 2);
+            RootContext.Register("log2", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
+            {
+                return new RuntimeValue.Digit(Math.Log(Args[0].CastTo<double>(), 2));
+            }, 1);
+            RootContext.Register("max", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
+            {
+                return new RuntimeValue.Digit(Math.Max(Args[0].CastTo<double>(), Args[1].CastTo<double>()));
+            }, 2);
+            RootContext.Register("min", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
+            {
+                return new RuntimeValue.Digit(Math.Min(Args[0].CastTo<double>(), Args[1].CastTo<double>()));
+            }, 2);
+            RootContext.Register("sgn", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
+            {
+                return new RuntimeValue.Digit(Math.Sign(Args[0].CastTo<double>()));
+            }, 1);
+
+            RootContext.Register("dot", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
+            {
+                if (Args[0].ValueType != RuntimeValueType.Tuple)
+                    throw new ArgumentException("arg 1 require type tuple(2).");
+                RuntimeValue.Tuple tTuple = (RuntimeValue.Tuple)Args[0];
+                if (tTuple.Value.Length != 2)
+                    throw new ArgumentException("arg 1 require type tuple(2).");
+                double tX = tTuple.Value[0].CastTo<double>();
+                double tY = tTuple.Value[1].CastTo<double>();
+                return new RuntimeValue.Digit(tX * tX + tY * tY);
+            }, 1);
+            RootContext.Register("cross", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
+            {
+                if (Args[0].ValueType != RuntimeValueType.Tuple)
+                    throw new ArgumentException("arg 1 require type tuple(2).");
+                if (Args[1].ValueType != RuntimeValueType.Tuple)
+                    throw new ArgumentException("arg 2 require type tuple(2).");
+                RuntimeValue.Tuple tTuple1 = (RuntimeValue.Tuple)Args[0];
+                RuntimeValue.Tuple tTuple2 = (RuntimeValue.Tuple)Args[1];
+                if (tTuple1.Value.Length != 2)
+                    throw new ArgumentException("arg 1 require type tuple(2).");
+                if (tTuple2.Value.Length != 2)
+                    throw new ArgumentException("arg 2 require type tuple(2).");
+                double tX1 = tTuple1.Value[0].CastTo<double>();
+                double tY1 = tTuple1.Value[1].CastTo<double>();
+                double tX2 = tTuple2.Value[0].CastTo<double>();
+                double tY2 = tTuple2.Value[1].CastTo<double>();
+                return new RuntimeValue.Digit(tX1 * tY2 - tX2 * tY1);
+            }, 2);
         }
 
-        // 计算一元运算
-        private object applyUnaryOperator(UnaryOp Operator, object Right, int LineNumber)
+        // 调用函数
+        // 不处理异常转换
+        private RuntimeValue doCallOperation(RuntimeContext Context, RuntimeValue Target, ASTNode.ArgList CallArgs)
         {
-            switch (Operator)
+            // 准备参数
+            RuntimeValue[] pArgs = EmptyArgs;
+            if (CallArgs.Args.Count > 0)
             {
-                case UnaryOp.Negative:
-                    if (Right is double)
-                        return -(double)Right;
-                    else if (Right is Vector2)
-                    {
-                        Vector2 tOrg = (Vector2)Right;
-                        tOrg.x = -tOrg.x;
-                        tOrg.y = -tOrg.y;
-                        return tOrg;
-                    }
-                    else
-                        throw new RuntimeException(LineNumber, 
-                            String.Format("can't perform negative operator on type {0}.", Right.GetType().ToString()));
-                default:
-                    throw new RuntimeException(LineNumber, "internal error.");
-            }
-        }
-
-        // 执行call操作
-        private object applyCallOperator(string Identifier, string IdentifierLower, ASTNode.ArgList Args, int LineNumber)
-        {
-            object pNativeFunc = fetchValueOfIdentifier(Identifier, IdentifierLower, LineNumber);
-            if (pNativeFunc is NativeCallHandler == false)
-                throw new RuntimeException(LineNumber, String.Format("\"{0}\" is not callable.", Identifier));
-            
-            NativeCallHandler pHandler = (NativeCallHandler)pNativeFunc;
-            object[] pArgs = null;
-            if (Args.Args.Count > 0)
-            {
-                pArgs = new object[Args.Args.Count];
-                for (int i = 0; i < Args.Args.Count; ++i)
+                pArgs = new RuntimeValue[CallArgs.Args.Count];
+                for (int i = 0; i < CallArgs.Args.Count; ++i)
                 {
                     // 计算参数
-                    pArgs[i] = ExecExpression(Args.Args[i]);
+                    pArgs[i] = execExpressionAST(Context, CallArgs.Args[i]);
                 }
             }
 
             // 调用函数
-            return pHandler(this, pArgs, LineNumber);
+            return Target.ApplyCallOperator(Context, pArgs);
         }
 
-        // 获取标识符的值
-        private object fetchValueOfIdentifier(string Identifier, string IdentifierLower, int LineNumber)
+        // 执行一个表达式语法树
+        // 返回执行结果
+        // 处理异常转换
+        private RuntimeValue execExpressionAST(RuntimeContext Context, ASTNode.Expression AST)
         {
-            object tRet;
-            if (!_Environment.TryGetValue(IdentifierLower, out tRet))
-                throw new RuntimeException(LineNumber, String.Format("\"{0}\" is not defined.", Identifier));
-            return tRet;
-        }
-
-        // 计算元组的值
-        private object calcuTupleValue(ASTNode.TupleExpression Expression, int LineNumber)
-        {
-            // 根据元组的成员数进行转换
-            if (Expression.Args.Count < 2)
-                throw new RuntimeException(LineNumber, "internal error.");
-            else if (Expression.Args.Count == 2)
+            switch (AST.Type)
             {
-                // 计算值
-                object tX = ExecExpression(Expression.Args[0]);
-                object tY = ExecExpression(Expression.Args[1]);
-                if (!(tX is double) || !(tY is double))
-                    throw new RuntimeException(LineNumber, "tuple element must be a digit.");
-                return new Vector2 { x = (double)tX, y = (double)tY };
+                case ASTNode.ASTType.BinaryExpression:
+                    {
+                        ASTNode.BinaryExpression tBinaryExpression = (ASTNode.BinaryExpression)AST;
+
+                        // 特殊处理assign操作
+                        if (tBinaryExpression.BinaryOperator == BinaryOp.Assign)
+                        {
+                            if (tBinaryExpression.Left.Type != ASTNode.ASTType.SymbolExpression)
+                            {
+                                throw new RuntimeException(tBinaryExpression.Left.LineNumber,
+                                    String.Format("left hand expression of assignment expression must be a symbol."));
+                            }
+
+                            // 进行赋值操作
+                            ASTNode.SymbolExpression tLeftHand = (ASTNode.SymbolExpression)tBinaryExpression.Left;
+                            try
+                            {
+                                RuntimeValue tRightVar = execExpressionAST(Context, tBinaryExpression.Right);
+                                Context[tLeftHand.IdentifierLower] = tRightVar;
+                                return tRightVar;
+                            }
+                            catch (KeyNotFoundException)
+                            {
+                                throw new RuntimeException(tBinaryExpression.LineNumber,
+                                    String.Format("identifier \"{0}\" is not defined.", tLeftHand.Identifier));
+                            }
+                        }
+                        else if (tBinaryExpression.BinaryOperator == BinaryOp.LogicalAnd)  // 特殊处理&&操作
+                        {
+                            RuntimeValue tLeftVar = execExpressionAST(Context, tBinaryExpression.Left);
+                            if (tLeftVar.ValueType != RuntimeValueType.Boolean)
+                                throw new RuntimeException(tBinaryExpression.Left.LineNumber,
+                                    String.Format("left hand expression of LogicAnd operator must return boolean."));
+                            RuntimeValue.Boolean tLeftBoolean = (RuntimeValue.Boolean)tLeftVar;
+                            if (tLeftBoolean.Value == false)
+                                return tLeftBoolean;  // 截断
+
+                            RuntimeValue tRightVar = execExpressionAST(Context, tBinaryExpression.Right);
+                            if (tRightVar.ValueType != RuntimeValueType.Boolean)
+                                throw new RuntimeException(tBinaryExpression.Right.LineNumber,
+                                    String.Format("right hand expression of LogicAnd operator must return boolean."));
+                            return tRightVar;
+                        }
+                        else if (tBinaryExpression.BinaryOperator == BinaryOp.LogicalOr)
+                        {
+                            RuntimeValue tLeftVar = execExpressionAST(Context, tBinaryExpression.Left);
+                            if (tLeftVar.ValueType != RuntimeValueType.Boolean)
+                                throw new RuntimeException(tBinaryExpression.Left.LineNumber,
+                                    String.Format("left hand expression of LogicOr operator must return boolean."));
+                            RuntimeValue.Boolean tLeftBoolean = (RuntimeValue.Boolean)tLeftVar;
+                            if (tLeftBoolean.Value == true)
+                                return tLeftBoolean;  // 截断
+
+                            RuntimeValue tRightVar = execExpressionAST(Context, tBinaryExpression.Right);
+                            if (tRightVar.ValueType != RuntimeValueType.Boolean)
+                                throw new RuntimeException(tBinaryExpression.Right.LineNumber,
+                                    String.Format("right hand expression of LogicOr operator must return boolean."));
+                            return tRightVar;
+                        }
+                        else
+                        {
+                            RuntimeValue tLeftVar = execExpressionAST(Context, tBinaryExpression.Left);
+                            RuntimeValue tRightVar = execExpressionAST(Context, tBinaryExpression.Right);
+                            try
+                            {
+                                return tLeftVar.ApplyBinaryOperator(tBinaryExpression.BinaryOperator, tRightVar);
+                            }
+                            catch (OperationNotSupport)
+                            {
+                                throw new RuntimeException(tBinaryExpression.LineNumber,
+                                    String.Format("can't perform {0} operation on type {1} and type {2}.", tBinaryExpression.BinaryOperator, tLeftVar.TypeToString(), tRightVar.TypeToString()));
+                            }
+                        }
+                    }
+                case ASTNode.ASTType.UnaryExpression:
+                    {
+                        ASTNode.UnaryExpression tUnaryExpression = (ASTNode.UnaryExpression)AST;
+                        RuntimeValue tRightVar = execExpressionAST(Context, tUnaryExpression.Right);
+                        try
+                        {
+                            return tRightVar.ApplyUnaryOperator(tUnaryExpression.UnaryOperator);
+                        }
+                        catch (OperationNotSupport)
+                        {
+                            throw new RuntimeException(tUnaryExpression.LineNumber,
+                                String.Format("can't perform {0} operation on type {1}.", tUnaryExpression.UnaryOperator, tRightVar.TypeToString()));
+                        }
+                    }
+                case ASTNode.ASTType.DigitLiteral:
+                    {
+                        ASTNode.DigitLiteral tDigitLiteral = (ASTNode.DigitLiteral)AST;
+                        return new RuntimeValue.Digit(tDigitLiteral.Value);
+                    }
+                case ASTNode.ASTType.StringLiteral:
+                    {
+                        ASTNode.StringLiteral tStringLiteral = (ASTNode.StringLiteral)AST;
+                        return new RuntimeValue.String(tStringLiteral.Value);
+                    }
+                case ASTNode.ASTType.BooleanLiteral:
+                    {
+                        ASTNode.BooleanLiteral tBooleanLiteral = (ASTNode.BooleanLiteral)AST;
+                        return new RuntimeValue.Boolean(tBooleanLiteral.Value);
+                    }
+                case ASTNode.ASTType.CallExpression:
+                    {
+                        ASTNode.CallExpression tCallExpression = (ASTNode.CallExpression)AST;
+                        RuntimeValue tCallTarget;
+                        try
+                        {
+                            // 获取被调用对象
+                            tCallTarget = Context[tCallExpression.IdentifierLower];
+                        }
+                        catch (KeyNotFoundException)
+                        {
+                            throw new RuntimeException(tCallExpression.LineNumber,
+                                String.Format("identifier \"{0}\" is not defined.", tCallExpression.Identifier));
+                        }
+                        try
+                        {
+                            // 执行调用操作
+                            return doCallOperation(Context, tCallTarget, tCallExpression.Args);
+                        }
+                        catch (OperationNotSupport)  // 操作不支持
+                        {
+                            throw new RuntimeException(tCallExpression.LineNumber,
+                                String.Format("identifier \"{0}\" is not callable.", tCallExpression.Identifier));
+                        }
+                        catch (ArgumentCountMismatch e)  // 参数数量不匹配
+                        {
+                            throw new RuntimeException(tCallExpression.LineNumber,
+                                String.Format("function \"{0}\" requires {1} arg(s), but {2} arg(s) are given.", tCallExpression.Identifier, e.ArgumentRequired, e.ArgumentGiven));
+                        }
+                        catch (Exception e)  // 一般性错误
+                        {
+                            throw new RuntimeException(tCallExpression.LineNumber,
+                                String.Format("function \"{0}\" throws exception: {1}", tCallExpression.Identifier, e.Message));
+                        }
+                    }
+                case ASTNode.ASTType.SymbolExpression:
+                    {
+                        ASTNode.SymbolExpression tSymbolExpression = (ASTNode.SymbolExpression)AST;
+                        try
+                        {
+                            // 获取值
+                            return Context[tSymbolExpression.IdentifierLower];
+                        }
+                        catch (KeyNotFoundException)
+                        {
+                            throw new RuntimeException(tSymbolExpression.LineNumber,
+                                String.Format("identifier \"{0}\" is not defined.", tSymbolExpression.Identifier));
+                        }
+                    }
+                case ASTNode.ASTType.TupleExpression:
+                    {
+                        ASTNode.TupleExpression tTupleExpression = (ASTNode.TupleExpression)AST;
+                        RuntimeValue[] tTupleValues = new RuntimeValue[tTupleExpression.Args.Count];
+
+                        for (int i = 0; i < tTupleExpression.Args.Count; ++i)
+                        {
+                            tTupleValues[i] = execExpressionAST(Context, tTupleExpression.Args[i]);
+                        }
+                        return new RuntimeValue.Tuple(tTupleValues);
+                    }
+                default:
+                    throw new RuntimeException(AST.LineNumber, "internal error, current syntax not implemented.");
             }
-            else
-                throw new RuntimeException(LineNumber, "tuple element count must be two.");
-        }
-        
-        // 执行for循环
-        private void doForLoop(string Identifier, string IdentifierLower, object From, object To, object Step, ASTNode.StatementList Block, int LineNumber)
-        {
-            if (!(From is double))
-                throw new RuntimeException(LineNumber, "from expression must return a digit.");
-            if (!(To is double))
-                throw new RuntimeException(LineNumber, "to expression must return a digit.");
-
-            double tFrom = (double)From;
-            double tTo = (double)To;
-
-            // 设置默认步长
-            if (Step == null)
-            {
-                if (tFrom <= tTo)
-                    Step = 1.0;
-                else if (tFrom >= tTo)
-                    Step = -1.0;
-            }
-
-            if (!(Step is double))
-                throw new RuntimeException(LineNumber, "step expression must return a digit.");
-
-            double tStep = (double)Step;
-            
-            // 赋予初值
-            if (!_Environment.ContainsKey(IdentifierLower))
-                _Environment.Add(IdentifierLower, tFrom);
-            else
-                _Environment[IdentifierLower] = tFrom;
-
-            // 执行for循环
-            while (true)
-            {
-                // ！ 当前的值可能在循环体中被用户代码改变。
-                object tCurrentObject = fetchValueOfIdentifier(Identifier, IdentifierLower, LineNumber);
-                if (!(tCurrentObject is double))
-                    throw new RuntimeException(LineNumber, "for iterator must be a digit.");
-
-                double tCurrent = (double)tCurrentObject;
-                
-                // 检查循环是否结束
-                if (tFrom <= tTo && tCurrent > tTo)
-                    break;
-                else if (tFrom > tTo && tCurrent < tTo)
-                    break;
-
-                // 执行函数体
-                ExecBlock(Block);
-
-                // Step计数
-                // ！ 重新获取值
-                tCurrentObject = fetchValueOfIdentifier(Identifier, IdentifierLower, LineNumber);
-                if (!(tCurrentObject is double))
-                    throw new RuntimeException(LineNumber, "for iterator must be a digit.");
-                tCurrent = (double)tCurrentObject + tStep;
-
-                // 设置值
-                if (!_Environment.ContainsKey(IdentifierLower))
-                    _Environment.Add(IdentifierLower, tCurrent);
-                else
-                    _Environment[IdentifierLower] = tCurrent;
-            }
         }
 
-        /// <summary>
-        /// 全局环境表
-        /// </summary>
-        public IDictionary<string, object> Environment
+        // 执行一个语句块
+        // 处理异常转换
+        private void execBlockAST(RuntimeContext Context, ASTNode.StatementList AST)
         {
-            get
-            {
-                return _Environment;
-            }
-        }
-
-        /// <summary>
-        /// 获取标识符的值
-        /// </summary>
-        /// <typeparam name="T">目标类型</typeparam>
-        /// <param name="Identifier">标识符</param>
-        /// <returns>值</returns>
-        public T FetchIdentifier<T>(string Identifier, int ContextLineNumber = 0)
-        {
-            object tValue = fetchValueOfIdentifier(Identifier, Identifier.ToLower(), ContextLineNumber);
-            if (!(tValue is T))
-                throw new RuntimeException(ContextLineNumber, String.Format("can't cast value to type {0}.", typeof(T).ToString()));
-            return (T)tValue;
-        }
-
-        /// <summary>
-        /// 注册空值
-        /// </summary>
-        /// <param name="Identifier">标识符</param>
-        public void RegisterIdentifier(string Identifier)
-        {
-            _Environment.Add(Identifier.ToLower(), new None());
-        }
-
-        /// <summary>
-        /// 注册一个数值
-        /// </summary>
-        /// <remarks>覆盖已有定义</remarks>
-        /// <param name="Identifier">标识符</param>
-        /// <param name="Value">数值</param>
-        public void RegisterIdentifier(string Identifier, double Value)
-        {
-            string IdLower = Identifier.ToLower();
-            if (_Environment.ContainsKey(IdLower))
-                _Environment[IdLower] = Value;
-            else
-                _Environment.Add(IdLower, Value);
-        }
-
-        /// <summary>
-        /// 注册一个二维向量
-        /// </summary>
-        /// <remarks>覆盖已有定义</remarks>
-        /// <param name="Identifier">标识符</param>
-        /// <param name="Value">数值</param>
-        public void RegisterIdentifier(string Identifier, Vector2 Value)
-        {
-            string IdLower = Identifier.ToLower();
-            if (_Environment.ContainsKey(IdLower))
-                _Environment[IdLower] = Value;
-            else
-                _Environment.Add(IdLower, Value);
-        }
-
-        /// <summary>
-        /// 注册原生函数
-        /// </summary>
-        /// <remarks>覆盖已有定义</remarks>
-        /// <param name="Identifier">标识符</param>
-        /// <param name="Handler">回调</param>
-        public void RegisterIdentifier(string Identifier, NativeCallHandler Handler)
-        {
-            string IdLower = Identifier.ToLower();
-            if (_Environment.ContainsKey(IdLower))
-                _Environment[IdLower] = Handler;
-            else
-                _Environment.Add(IdLower, Handler);
-        }
-
-        /// <summary>
-        /// 移除标识符
-        /// </summary>
-        /// <param name="Identifier">标识符</param>
-        public bool RemoveIdentifier(string Identifier)
-        {
-            return _Environment.Remove(Identifier.ToLower());
-        }
-
-        /// <summary>
-        /// 执行一个区块
-        /// </summary>
-        /// <param name="StatementList">语句列表语法树</param>
-        public void ExecBlock(ASTNode.StatementList StatementList)
-        {
-            foreach (ASTNode.Statement s in StatementList.Statements)
+            foreach (ASTNode.Statement s in AST.Statements)
             {
                 switch (s.Type)
                 {
+                    case ASTNode.ASTType.Initialization:
+                        {
+                            ASTNode.Initialization tInitialization = (ASTNode.Initialization)s;
+                            RuntimeValue tResult = execExpressionAST(Context, tInitialization.AssignmentExpression);
+                            Context.Set(tInitialization.IdentifierLower, tResult);  // 不抛出异常
+                        }
+                        break;
                     case ASTNode.ASTType.Assignment:
                         {
                             ASTNode.Assignment tAssignment = (ASTNode.Assignment)s;
-                            object tResult = ExecExpression(tAssignment.AssignmentExpression);
-                            if (!_Environment.ContainsKey(tAssignment.IdentifierLower))
-                                _Environment.Add(tAssignment.IdentifierLower, tResult);
-                            else
-                                _Environment[tAssignment.IdentifierLower] = tResult;
+                            RuntimeValue tResult = execExpressionAST(Context, tAssignment.AssignmentExpression);
+                            try
+                            {
+                                Context[tAssignment.IdentifierLower] = tResult;
+                            }
+                            catch (KeyNotFoundException)
+                            {
+                                throw new RuntimeException(s.LineNumber,
+                                    String.Format("identifier \"{0}\" is not defined.", tAssignment.Identifier));
+                            }
                         }
                         break;
                     case ASTNode.ASTType.Call:
                         {
                             ASTNode.Call tCall = (ASTNode.Call)s;
-                            applyCallOperator(tCall.Identifier, tCall.IdentifierLower, tCall.Args, s.LineNumber);
+                            RuntimeValue tCallTarget;
+                            try
+                            {
+                                // 获取被调用对象
+                                tCallTarget = Context[tCall.IdentifierLower];
+                            }
+                            catch (KeyNotFoundException)
+                            {
+                                throw new RuntimeException(s.LineNumber,
+                                    String.Format("identifier \"{0}\" is not defined.", tCall.Identifier));
+                            }
+                            try
+                            {
+                                // 执行调用操作
+                                doCallOperation(Context, tCallTarget, tCall.Args);
+                            }
+                            catch (OperationNotSupport)  // 操作不支持
+                            {
+                                throw new RuntimeException(s.LineNumber,
+                                    String.Format("identifier \"{0}\" is not callable.", tCall.Identifier));
+                            }
+                            catch (ArgumentCountMismatch e)  // 参数数量不匹配
+                            {
+                                throw new RuntimeException(s.LineNumber,
+                                    String.Format("function \"{0}\" requires {1} arg(s), but {2} arg(s) are given.", tCall.Identifier, e.ArgumentRequired, e.ArgumentGiven));
+                            }
+                            catch (Exception e)  // 一般性错误
+                            {
+                                throw new RuntimeException(s.LineNumber,
+                                    String.Format("function \"{0}\" throws exception: {1}", tCall.Identifier, e.Message));
+                            }
                         }
                         break;
                     case ASTNode.ASTType.ForStatement:
                         {
                             ASTNode.ForStatement tForStatement = (ASTNode.ForStatement)s;
-                            object tFromResult = ExecExpression(tForStatement.FromExpression);
-                            object tToResult = ExecExpression(tForStatement.ToExpression);
-                            object tStepResult = tForStatement.StepExpression == null ? null : ExecExpression(tForStatement.StepExpression);
-                            doForLoop(
-                                tForStatement.Identifier, 
-                                tForStatement.IdentifierLower, 
-                                tFromResult, 
-                                tToResult, 
-                                tStepResult, 
-                                tForStatement.ExecBlock,
-                                s.LineNumber
-                                );
+
+                            // 计算from、to
+                            RuntimeValue tFromResult = execExpressionAST(Context, tForStatement.FromExpression);
+                            RuntimeValue tToResult = execExpressionAST(Context, tForStatement.ToExpression);
+
+                            // 检查方向
+                            bool bIncreasing;
+                            try
+                            {
+                                // 执行比较过程
+                                RuntimeValue tTest = tFromResult.ApplyBinaryOperator(BinaryOp.LessEqual, tToResult);
+
+                                // 赋予初值：若from <= to，则Step = 1，否则Step = -1
+                                if (tTest.ValueType == RuntimeValueType.Boolean)
+                                {
+                                    RuntimeValue.Boolean tBoolean = (RuntimeValue.Boolean)tTest;
+                                    bIncreasing = tBoolean.Value;
+                                }
+                                else
+                                    throw new RuntimeException(s.LineNumber, "the LessEqual operation on from and or expression should return a boolean type.");
+                            }
+                            catch (OperationNotSupport)
+                            {
+                                throw new RuntimeException(s.LineNumber, "can't apply LessEqual operator on result of from and or expression.");
+                            }
+
+                            // 计算step或者给予初值
+                            RuntimeValue tStepResult = null;
+                            if (tForStatement.StepExpression != null)
+                                tStepResult = execExpressionAST(Context, tForStatement.StepExpression);
+                            else
+                                tStepResult = bIncreasing ? DefaultForStepSize : DefaultForStepSizeReverse;
+
+                            // 在For循环的上下文中设置循环变量
+                            Context.Set(tForStatement.IdentifierLower, tFromResult);
+
+                            // 执行for循环
+                            while (true)
+                            {
+                                // 获取循环变量
+                                RuntimeValue tForVar;
+                                try
+                                {
+                                    tForVar = Context[tForStatement.IdentifierLower];
+                                }
+                                catch (KeyNotFoundException)
+                                {
+                                    throw new RuntimeException(s.LineNumber,
+                                        String.Format("loop variable \"{0}\" is not defined.", tForStatement.Identifier));
+                                }
+
+                                // 检查循环是否结束
+                                if (bIncreasing)
+                                {
+                                    try
+                                    {
+                                        RuntimeValue tTest = tForVar.ApplyBinaryOperator(BinaryOp.Greater, tToResult);
+                                        if (tTest.ValueType == RuntimeValueType.Boolean)
+                                        {
+                                            RuntimeValue.Boolean tBoolean = (RuntimeValue.Boolean)tTest;
+                                            if (tBoolean.Value)
+                                                break;
+                                        }
+                                        else
+                                            throw new RuntimeException(s.LineNumber, "the Greater operation on loop variable and to expression should return a boolean type.");
+                                    }
+                                    catch (OperationNotSupport)
+                                    {
+                                        throw new RuntimeException(s.LineNumber, "can't apply Greater operator on loop variable and to expression.");
+                                    }
+                                }
+                                else
+                                {
+                                    try
+                                    {
+                                        RuntimeValue tTest = tForVar.ApplyBinaryOperator(BinaryOp.Less, tToResult);
+                                        if (tTest.ValueType == RuntimeValueType.Boolean)
+                                        {
+                                            RuntimeValue.Boolean tBoolean = (RuntimeValue.Boolean)tTest;
+                                            if (tBoolean.Value)
+                                                break;
+                                        }
+                                        else
+                                            throw new RuntimeException(s.LineNumber, "the Less operation on loop variable and to expression should return a boolean type.");
+                                    }
+                                    catch (OperationNotSupport)
+                                    {
+                                        throw new RuntimeException(s.LineNumber, "can't apply Less operator on loop variable and to expression.");
+                                    }
+                                }
+
+                                // 执行函数体
+                                execBlockAST(Context, tForStatement.ExecBlock);
+
+                                // Step计数
+                                try
+                                {
+                                    Context.Set(tForStatement.IdentifierLower, tForVar.ApplyBinaryOperator(BinaryOp.Plus, tStepResult));
+                                }
+                                catch (OperationNotSupport)
+                                {
+                                    throw new RuntimeException(s.LineNumber, "can't apply Plus operator on loop variable and step expression.");
+                                }
+                            }
                         }
                         break;
                     default:
-                        throw new RuntimeException(s.LineNumber, "internal error.");
+                        throw new RuntimeException(s.LineNumber, "internal error, current syntax not implemented.");
                 }
             }
         }
 
         /// <summary>
-        /// 执行一个表达式
+        /// 执行语法树
         /// </summary>
-        /// <param name="Expression">表达式语法树</param>
-        /// <returns>执行结果</returns>
-        public object ExecExpression(ASTNode.Expression Expression)
+        /// <param name="StatementList">语法树对象</param>
+        public void ExecAST(ASTNode.StatementList AST)
         {
-            switch (Expression.Type)
-            {
-                case ASTNode.ASTType.BinaryExpression:
-                    {
-                        ASTNode.BinaryExpression tBinaryExpression = (ASTNode.BinaryExpression)Expression;
-                        object tLeftResult = ExecExpression(tBinaryExpression.Left);
-                        object tRightResult = ExecExpression(tBinaryExpression.Right);
-                        return applyBinaryOperator(tBinaryExpression.BinaryOperator, tLeftResult, tRightResult, Expression.LineNumber);
-                    }
-                case ASTNode.ASTType.UnaryExpression:
-                    {
-                        ASTNode.UnaryExpression tUnaryExpression = (ASTNode.UnaryExpression)Expression;
-                        object tRightResult = ExecExpression(tUnaryExpression.Right);
-                        return applyUnaryOperator(tUnaryExpression.UnaryOperator, tRightResult, Expression.LineNumber);
-                    }
-                case ASTNode.ASTType.DigitLiteral:
-                    {
-                        ASTNode.DigitLiteral tDigitLiteral = (ASTNode.DigitLiteral)Expression;
-                        return tDigitLiteral.Value;
-                    }
-                case ASTNode.ASTType.CallExpression:
-                    {
-                        ASTNode.CallExpression tCallExpression = (ASTNode.CallExpression)Expression;
-                        return applyCallOperator(
-                            tCallExpression.Identifier, 
-                            tCallExpression.IdentifierLower, 
-                            tCallExpression.Args,
-                            Expression.LineNumber
-                            );
-                    }
-                case ASTNode.ASTType.SymbolExpression:
-                    {
-                        ASTNode.SymbolExpression tSymbolExpression = (ASTNode.SymbolExpression)Expression;
-                        return fetchValueOfIdentifier(
-                            tSymbolExpression.Identifier,
-                            tSymbolExpression.IdentifierLower,
-                            Expression.LineNumber
-                            );
-                    }
-                case ASTNode.ASTType.TupleExpression:
-                    {
-                        ASTNode.TupleExpression tTupleExpression = (ASTNode.TupleExpression)Expression;
-                        return calcuTupleValue(tTupleExpression, Expression.LineNumber);
-                    }
-                default:
-                    throw new RuntimeException(Expression.LineNumber, "internal error.");
-            }
+            execBlockAST(_RootContext, AST);
         }
 
         public Runtime()
         {
-            RegisterIdentifier("pi", Math.PI);
-            RegisterIdentifier("e", Math.E);
-
-            RegisterIdentifier("dot", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("dot", Args, 1, LineNumber);
-                Vector2 tArg = ArgCheckHelper<Vector2>("dot", Args, 0, LineNumber);
-                return tArg.x * tArg.x + tArg.y * tArg.y;
-            });
-            RegisterIdentifier("cross", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("cross", Args, 2, LineNumber);
-                Vector2 tLeft = ArgCheckHelper<Vector2>("cross", Args, 0, LineNumber);
-                Vector2 tRight = ArgCheckHelper<Vector2>("cross", Args, 1, LineNumber);
-                return tLeft.x * tRight.y - tRight.x * tLeft.y;
-            });
-            RegisterIdentifier("sin", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("sin", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("sin", Args, 0, LineNumber);
-                return Math.Sin(tArg);
-            });
-            RegisterIdentifier("cos", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("cos", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("cos", Args, 0, LineNumber);
-                return Math.Cos(tArg);
-            });
-            RegisterIdentifier("tan", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("tan", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("tan", Args, 0, LineNumber);
-                return Math.Tan(tArg);
-            });
-            RegisterIdentifier("sinh", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("sinh", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("sinh", Args, 0, LineNumber);
-                return Math.Sinh(tArg);
-            });
-            RegisterIdentifier("cosh", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("cosh", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("cosh", Args, 0, LineNumber);
-                return Math.Cosh(tArg);
-            });
-            RegisterIdentifier("tanh", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("tanh", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("tanh", Args, 0, LineNumber);
-                return Math.Tanh(tArg);
-            });
-            RegisterIdentifier("asin", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("asin", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("asin", Args, 0, LineNumber);
-                return Math.Asin(tArg);
-            });
-            RegisterIdentifier("acos", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("acos", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("acos", Args, 0, LineNumber);
-                return Math.Acos(tArg);
-            });
-            RegisterIdentifier("atan", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("atan", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("atan", Args, 0, LineNumber);
-                return Math.Atan(tArg);
-            });
-            RegisterIdentifier("atan2", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("atan2", Args, 2, LineNumber);
-                double tY = ArgCheckHelper<double>("atan2", Args, 0, LineNumber);
-                double tX = ArgCheckHelper<double>("atan2", Args, 1, LineNumber);
-                return Math.Atan2(tY, tX);
-            });
-            RegisterIdentifier("sqrt", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("sqrt", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("sqrt", Args, 0, LineNumber);
-                return Math.Sqrt(tArg);
-            });
-            RegisterIdentifier("exp", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("exp", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("exp", Args, 0, LineNumber);
-                return Math.Exp(tArg);
-            });
-            RegisterIdentifier("ln", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("ln", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("ln", Args, 0, LineNumber);
-                return Math.Log(tArg);
-            });
-            RegisterIdentifier("log2", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("log2", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("log2", Args, 0, LineNumber);
-                return Math.Log(tArg, 2);
-            });
-            RegisterIdentifier("log10", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("log10", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("log10", Args, 0, LineNumber);
-                return Math.Log10(tArg);
-            });
-            RegisterIdentifier("abs", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("abs", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("abs", Args, 0, LineNumber);
-                return Math.Abs(tArg);
-            });
-            RegisterIdentifier("max", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("max", Args, 2, LineNumber);
-                double tArg1 = ArgCheckHelper<double>("max", Args, 0, LineNumber);
-                double tArg2 = ArgCheckHelper<double>("max", Args, 1, LineNumber);
-                return Math.Max(tArg1, tArg2);
-            });
-            RegisterIdentifier("min", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("min", Args, 2, LineNumber);
-                double tArg1 = ArgCheckHelper<double>("min", Args, 0, LineNumber);
-                double tArg2 = ArgCheckHelper<double>("min", Args, 1, LineNumber);
-                return Math.Min(tArg1, tArg2);
-            });
-            RegisterIdentifier("ceil", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("ceil", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("ceil", Args, 0, LineNumber);
-                return Math.Ceiling(tArg);
-            });
-            RegisterIdentifier("floor", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("floor", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("floor", Args, 0, LineNumber);
-                return Math.Floor(tArg);
-            });
-            RegisterIdentifier("round", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("round", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("round", Args, 0, LineNumber);
-                return Math.Round(tArg);
-            });
-            RegisterIdentifier("trunc", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("trunc", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("trunc", Args, 0, LineNumber);
-                return Math.Truncate(tArg);
-            });
-            RegisterIdentifier("sgn", (NativeCallHandler)delegate(Runtime Context, object[] Args, int LineNumber)
-            {
-                ArgCountCheckHelper("sgn", Args, 1, LineNumber);
-                double tArg = ArgCheckHelper<double>("sgn", Args, 0, LineNumber);
-                return Math.Sign(tArg);
-            });
+            initRootContext();
         }
     }
 }
