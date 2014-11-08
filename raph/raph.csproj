@@ -31,6 +31,9 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -121,7 +124,9 @@
     <None Include="Resources\Icon_Busy.png" />
     <None Include="Resources\Icon_Error.png" />
     <None Include="Resources\Icon_Info.png" />
+    <Content Include="app.ico" />
     <Content Include="Resources\Icon_Play.png" />
+    <None Include="Resources\Icon_Restart.png" />
     <Content Include="Resources\Icon_Save.png" />
     <Content Include="Resources\Icon_Stop.png" />
   </ItemGroup>

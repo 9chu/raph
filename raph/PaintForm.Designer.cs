@@ -39,17 +39,18 @@
             this.listView_info = new System.Windows.Forms.ListView();
             this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnHeader2 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.columnHeader6 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnHeader3 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnHeader4 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnHeader5 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
-            this.columnHeader6 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.imageList_main = new System.Windows.Forms.ImageList(this.components);
             this.tabPage2 = new System.Windows.Forms.TabPage();
             this.textBox_output = new System.Windows.Forms.TextBox();
             this.pictureBox_result = new System.Windows.Forms.PictureBox();
-            this.toolStripButton1 = new System.Windows.Forms.ToolStripButton();
-            this.toolStripButton2 = new System.Windows.Forms.ToolStripButton();
-            this.toolStripButton3 = new System.Windows.Forms.ToolStripButton();
+            this.toolStripButton_stop = new System.Windows.Forms.ToolStripButton();
+            this.toolStripButton_restart = new System.Windows.Forms.ToolStripButton();
+            this.toolStripButton_save = new System.Windows.Forms.ToolStripButton();
+            this.saveFileDialog_image = new System.Windows.Forms.SaveFileDialog();
             this.toolStrip_main.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer_main)).BeginInit();
             this.splitContainer_main.Panel1.SuspendLayout();
@@ -64,10 +65,10 @@
             // toolStrip_main
             // 
             this.toolStrip_main.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.toolStripButton1,
-            this.toolStripButton2,
+            this.toolStripButton_stop,
+            this.toolStripButton_restart,
             this.toolStripSeparator1,
-            this.toolStripButton3});
+            this.toolStripButton_save});
             this.toolStrip_main.Location = new System.Drawing.Point(0, 0);
             this.toolStrip_main.Name = "toolStrip_main";
             this.toolStrip_main.Size = new System.Drawing.Size(626, 25);
@@ -160,6 +161,11 @@
             this.columnHeader2.Text = "时间";
             this.columnHeader2.Width = 45;
             // 
+            // columnHeader6
+            // 
+            this.columnHeader6.Text = "说明";
+            this.columnHeader6.Width = 380;
+            // 
             // columnHeader3
             // 
             this.columnHeader3.Text = "行";
@@ -174,11 +180,6 @@
             // 
             this.columnHeader5.Text = "位置";
             this.columnHeader5.Width = 40;
-            // 
-            // columnHeader6
-            // 
-            this.columnHeader6.Text = "说明";
-            this.columnHeader6.Width = 380;
             // 
             // imageList_main
             // 
@@ -220,32 +221,44 @@
             this.pictureBox_result.TabIndex = 0;
             this.pictureBox_result.TabStop = false;
             // 
-            // toolStripButton1
+            // toolStripButton_stop
             // 
-            this.toolStripButton1.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.toolStripButton1.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButton1.Image")));
-            this.toolStripButton1.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.toolStripButton1.Name = "toolStripButton1";
-            this.toolStripButton1.Size = new System.Drawing.Size(23, 22);
-            this.toolStripButton1.Text = "toolStripButton1";
+            this.toolStripButton_stop.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.toolStripButton_stop.Enabled = false;
+            this.toolStripButton_stop.Image = global::raph.Properties.Resources.Icon_Stop;
+            this.toolStripButton_stop.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.toolStripButton_stop.Name = "toolStripButton_stop";
+            this.toolStripButton_stop.Size = new System.Drawing.Size(23, 22);
+            this.toolStripButton_stop.Text = "终止";
+            this.toolStripButton_stop.Click += new System.EventHandler(this.toolStripButton_stop_Click);
             // 
-            // toolStripButton2
+            // toolStripButton_restart
             // 
-            this.toolStripButton2.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.toolStripButton2.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButton2.Image")));
-            this.toolStripButton2.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.toolStripButton2.Name = "toolStripButton2";
-            this.toolStripButton2.Size = new System.Drawing.Size(23, 22);
-            this.toolStripButton2.Text = "toolStripButton2";
+            this.toolStripButton_restart.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.toolStripButton_restart.Enabled = false;
+            this.toolStripButton_restart.Image = global::raph.Properties.Resources.Icon_Restart;
+            this.toolStripButton_restart.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.toolStripButton_restart.Name = "toolStripButton_restart";
+            this.toolStripButton_restart.Size = new System.Drawing.Size(23, 22);
+            this.toolStripButton_restart.Text = "重新运行";
+            this.toolStripButton_restart.Click += new System.EventHandler(this.toolStripButton_restart_Click);
             // 
-            // toolStripButton3
+            // toolStripButton_save
             // 
-            this.toolStripButton3.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.toolStripButton3.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButton3.Image")));
-            this.toolStripButton3.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.toolStripButton3.Name = "toolStripButton3";
-            this.toolStripButton3.Size = new System.Drawing.Size(23, 22);
-            this.toolStripButton3.Text = "toolStripButton3";
+            this.toolStripButton_save.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.toolStripButton_save.Enabled = false;
+            this.toolStripButton_save.Image = global::raph.Properties.Resources.Icon_Save;
+            this.toolStripButton_save.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.toolStripButton_save.Name = "toolStripButton_save";
+            this.toolStripButton_save.Size = new System.Drawing.Size(23, 22);
+            this.toolStripButton_save.Text = "保存当前绘制结果";
+            this.toolStripButton_save.Click += new System.EventHandler(this.toolStripButton_save_Click);
+            // 
+            // saveFileDialog_image
+            // 
+            this.saveFileDialog_image.DefaultExt = "png";
+            this.saveFileDialog_image.Filter = "PNG图像|*.png";
+            this.saveFileDialog_image.Title = "保存图片";
             // 
             // PaintForm
             // 
@@ -258,6 +271,7 @@
             this.DockAreas = ((WeifenLuo.WinFormsUI.Docking.DockAreas)((WeifenLuo.WinFormsUI.Docking.DockAreas.Float | WeifenLuo.WinFormsUI.Docking.DockAreas.Document)));
             this.Font = new System.Drawing.Font("宋体", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
             this.HideOnClose = true;
+            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "PaintForm";
             this.Text = "执行";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.PaintForm_FormClosing);
@@ -288,10 +302,10 @@
         private System.Windows.Forms.TabPage tabPage2;
         private System.Windows.Forms.ListView listView_info;
         private System.Windows.Forms.ImageList imageList_main;
-        private System.Windows.Forms.ToolStripButton toolStripButton1;
-        private System.Windows.Forms.ToolStripButton toolStripButton2;
+        private System.Windows.Forms.ToolStripButton toolStripButton_stop;
+        private System.Windows.Forms.ToolStripButton toolStripButton_restart;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
-        private System.Windows.Forms.ToolStripButton toolStripButton3;
+        private System.Windows.Forms.ToolStripButton toolStripButton_save;
         private System.Windows.Forms.TextBox textBox_output;
         private System.Windows.Forms.ColumnHeader columnHeader1;
         private System.Windows.Forms.ColumnHeader columnHeader2;
@@ -300,5 +314,6 @@
         private System.Windows.Forms.ColumnHeader columnHeader5;
         private System.Windows.Forms.ColumnHeader columnHeader6;
         private System.Windows.Forms.PictureBox pictureBox_result;
+        private System.Windows.Forms.SaveFileDialog saveFileDialog_image;
     }
 }

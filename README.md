@@ -131,16 +131,20 @@
     ORIGIN = (0, 0)
     ROT = 0
     SCALE = (1, 1)
+    PIXELSIZE = 1.5
 ```
 
 - 特化函数
 
 ```
     draw
-    setPixelA
-    setPixelR
-    setPixelG
-    setPixelB
+    clear
+    refresh
+    sleep
+    setPixelAlpha
+    setPixelRed
+    setPixelGreen
+    setPixelBlue
 ```
 
 - 变换顺序：比例 -> 旋转 -> 平移

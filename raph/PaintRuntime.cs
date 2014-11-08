@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Drawing;
+using System.Threading;
 
 using raph.Language;
 
@@ -16,13 +17,17 @@ namespace raph
         private Runtime _Runtime = new Runtime();
 
         private Bitmap _TargetBuffer = new Bitmap(640, 480);
+        private Graphics _Graph = null;
         private Color _PixelColor = Color.Black;
+        private SolidBrush _Brush = new SolidBrush(Color.Black);
 
         public delegate void OnRuntimeExceptionHandler(PaintRuntime Sender, RuntimeException e);
         public delegate void OnOutputTextHandler(PaintRuntime Sender, string Content);
+        public delegate void OnRefreshHandler(PaintRuntime Sender);
 
         public event OnRuntimeExceptionHandler OnRuntimeException;
         public event OnOutputTextHandler OnOutputText;
+        public event OnRefreshHandler OnRefresh;
 
         private void castTuple2ToFloat2(RuntimeValue Input, out double X, out double Y)
         {
@@ -63,12 +68,16 @@ namespace raph
 
         public PaintRuntime()
         {
+            _Graph = Graphics.FromImage(_TargetBuffer);
+            _Graph.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+
             RuntimeContext tContext = _Runtime.RootContext;
 
             // 注册常量
             tContext.Register("origin", new RuntimeValue.Tuple(new RuntimeValue[] { new RuntimeValue.Digit(0), new RuntimeValue.Digit(0) }));
             tContext.Register("scale", new RuntimeValue.Tuple(new RuntimeValue[] { new RuntimeValue.Digit(1), new RuntimeValue.Digit(1) }));
             tContext.Register("rot", 0.0);
+            tContext.Register("pixelSize", 1.5);
 
             // 注册函数
             tContext.Register("print", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
@@ -80,6 +89,40 @@ namespace raph
                 }
                 return new RuntimeValue.None();
             });
+            tContext.Register("clear", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
+            {
+                if (Args.Length == 0)
+                    _Graph.Clear(Color.Transparent);
+                else if (Args.Length == 3)
+                {
+                    _Graph.Clear(Color.FromArgb(
+                        (int)Args[0].CastTo<double>(),
+                        (int)Args[1].CastTo<double>(),
+                        (int)Args[2].CastTo<double>()));
+                }
+                else if (Args.Length == 4)
+                {
+                    _Graph.Clear(Color.FromArgb(
+                        (int)Args[0].CastTo<double>(),
+                        (int)Args[1].CastTo<double>(),
+                        (int)Args[2].CastTo<double>(),
+                        (int)Args[3].CastTo<double>()));
+                }
+                else
+                    throw new ArgumentCountMismatch(3, Args.Length);
+                return new RuntimeValue.None();
+            });
+            tContext.Register("refresh", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
+            {
+                if (OnRefresh != null)
+                    OnRefresh(this);
+                return new RuntimeValue.None();
+            }, 0);
+            tContext.Register("sleep", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
+            {
+                Thread.Sleep((int)Args[0].CastTo<double>());
+                return new RuntimeValue.None();
+            }, 1);
             tContext.Register("draw", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)
             {
                 double tX = Args[0].CastTo<double>();
@@ -88,6 +131,7 @@ namespace raph
                 double tOriginX, tOriginY;
                 double tScaleX, tScaleY;
                 double tRotation = Context["rot"].CastTo<double>();
+                float tPixelSize = (float)Context["pixelsize"].CastTo<double>();
 
                 // 获取环境变量
                 try
@@ -120,8 +164,8 @@ namespace raph
                 tX += tOriginX;
                 tY += tOriginY;
 
-                if (!(tX >= _TargetBuffer.Width || tX < 0 || tY < 0 || tY >= _TargetBuffer.Height))
-                    _TargetBuffer.SetPixel((int)tX, (int)tY, _PixelColor);
+                _Brush.Color = _PixelColor;
+                _Graph.FillEllipse(_Brush, (float)(tX - tPixelSize / 2), (float)(tY - tPixelSize / 2), tPixelSize, tPixelSize);
                 return new RuntimeValue.None();
             }, 2);
             tContext.Register("setPixelAlpha", (ExternalFunctionHandler)delegate(RuntimeContext Context, RuntimeValue[] Args)

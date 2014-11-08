@@ -103,6 +103,16 @@ namespace raph.Properties {
         /// <summary>
         ///   查找 System.Drawing.Bitmap 类型的本地化资源。
         /// </summary>
+        internal static System.Drawing.Bitmap Icon_Restart {
+            get {
+                object obj = ResourceManager.GetObject("Icon_Restart", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
         internal static System.Drawing.Bitmap Icon_Save {
             get {
                 object obj = ResourceManager.GetObject("Icon_Save", resourceCulture);

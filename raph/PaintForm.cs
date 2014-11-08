@@ -39,6 +39,10 @@ namespace raph
             pictureBox_result.BackgroundImage = Properties.Resources.Icon_Busy;
             pictureBox_result.Width = pictureBox_result.BackgroundImage.Width;
             pictureBox_result.Height = pictureBox_result.BackgroundImage.Height;
+
+            toolStripButton_stop.Enabled = true;
+            toolStripButton_restart.Enabled = false;
+            toolStripButton_save.Enabled = false;
         }
 
         // 写日志函数
@@ -77,81 +81,120 @@ namespace raph
         private void writeOutputText(string Content)
         {
             this.Invoke((Action)delegate() {
-                textBox_output.Text += Content;
+                textBox_output.Text += Content.Replace("\n", "\r\n");
             });
         }
 
         // 工作线程
         private void workThreadJob()
         {
-            Stopwatch tWatch = new Stopwatch();
-
-            // 初始化状态
-            this.Invoke((Action)initState);
-
-            // 检查AST树是否已生成
-            if (_AST != null)
-                writeLog("忽略解析过程");
-            else
+            try
             {
-                writeLog("正在执行解析过程...");
+                Stopwatch tWatch = new Stopwatch();
 
-                // 解析代码
-                bool bCompileSucceed = false;
-                using (StringReader tReader = new StringReader(_SourceCode))
+                // 初始化状态
+                this.Invoke((Action)initState);
+
+                // 检查AST树是否已生成
+                if (_AST != null)
+                    writeLog("忽略解析过程");
+                else
                 {
+                    writeLog("正在执行解析过程...");
+
+                    // 解析代码
+                    bool bCompileSucceed = false;
+                    using (StringReader tReader = new StringReader(_SourceCode))
+                    {
+                        tWatch.Start();
+                        try
+                        {
+                            Language.Lexer tLexer = new Language.Lexer(tReader);  // 初始化Lexer
+                            _AST = Language.Syntax.Parse(tLexer);  // 解析
+                            bCompileSucceed = true;
+                        }
+                        catch (Language.LexcialException e)
+                        {
+                            writeLog(String.Format("词法错误：{0}", e.Description), LogType.Error, e.Line, e.Row, e.Position);
+                        }
+                        catch (Language.SyntaxException e)
+                        {
+                            writeLog(String.Format("语法错误：{0}", e.Description), LogType.Error, e.Line, e.Row, e.Position);
+                        }
+                        catch (Exception e)
+                        {
+                            writeLog(String.Format("一般性错误：{0}", e.Message), LogType.Error);
+                        }
+                        tWatch.Stop();
+                        if (bCompileSucceed)
+                            writeLog(String.Format("解析成功，耗时：{0} 秒", tWatch.ElapsedMilliseconds / 1000.0));
+                        else
+                        {
+                            writeLog(String.Format("解析失败，耗时：{0} 秒", tWatch.ElapsedMilliseconds / 1000.0), LogType.Error);
+
+                            this.Invoke((Action)delegate()
+                            {
+                                toolStripButton_stop.Enabled = false;
+                                toolStripButton_restart.Enabled = true;
+                                toolStripButton_save.Enabled = false;
+                            });
+                        }
+                    }
+                }
+
+                if (_AST != null)
+                {
+                    // 执行语法树
+                    PaintRuntime tRT = new PaintRuntime();
+                    tRT.OnOutputText += delegate(PaintRuntime sender, string Content)
+                    {
+                        writeOutputText(Content + "\r\n");
+                    };
+                    tRT.OnRuntimeException += delegate(PaintRuntime sender, Language.RuntimeException e)
+                    {
+                        writeLog(String.Format("运行时错误：{0}", e.Description), LogType.Error, e.Line);
+                    };
+                    tRT.OnRefresh += delegate(PaintRuntime sender)
+                    {
+                        Bitmap tBufferCopy = (Bitmap)sender.TargetBuffer.Clone();
+                        // 设置图片
+                        this.Invoke((Action)delegate()
+                        {
+                            pictureBox_result.BackgroundImage = tBufferCopy;
+                            pictureBox_result.Width = pictureBox_result.BackgroundImage.Width;
+                            pictureBox_result.Height = pictureBox_result.BackgroundImage.Height;
+                        });
+                    };
+
+                    // 执行
+                    writeLog("正在执行...");
                     tWatch.Start();
-                    try
-                    {
-                        Language.Lexer tLexer = new Language.Lexer(tReader);  // 初始化Lexer
-                        _AST = Language.Syntax.Parse(tLexer);  // 解析
-                        bCompileSucceed = true;
-                    }
-                    catch (Language.LexcialException e)
-                    {
-                        writeLog(String.Format("词法错误：{0}", e.Description), LogType.Error, e.Line, e.Row, e.Position);
-                    }
-                    catch (Language.SyntaxException e)
-                    {
-                        writeLog(String.Format("语法错误：{0}", e.Description), LogType.Error, e.Line, e.Row, e.Position);
-                    }
-                    catch (Exception e)
-                    {
-                        writeLog(String.Format("一般性错误：{0}", e.Message), LogType.Error);
-                    }
+                    tRT.RunAST(_AST);
                     tWatch.Stop();
-                    if (bCompileSucceed)
-                        writeLog(String.Format("解析成功，耗时：{0} 秒", tWatch.ElapsedMilliseconds / 1000.0));
-                    else
-                        writeLog(String.Format("解析失败，耗时：{0} 秒", tWatch.ElapsedMilliseconds / 1000.0), LogType.Error);
+                    writeLog(String.Format("执行完毕，耗时：{0} 秒", tWatch.ElapsedMilliseconds / 1000.0));
+
+                    // 设置图片
+                    this.Invoke((Action)delegate()
+                    {
+                        pictureBox_result.BackgroundImage = tRT.TargetBuffer;
+                        pictureBox_result.Width = pictureBox_result.BackgroundImage.Width;
+                        pictureBox_result.Height = pictureBox_result.BackgroundImage.Height;
+
+                        toolStripButton_stop.Enabled = false;
+                        toolStripButton_restart.Enabled = true;
+                        toolStripButton_save.Enabled = true;
+                    });
                 }
             }
-
-            if (_AST != null)
+            catch (ThreadAbortException)
             {
-                // 执行语法树
-                PaintRuntime tRT = new PaintRuntime();
-                tRT.OnOutputText += delegate(PaintRuntime sender, string Content)
-                {
-                    writeOutputText(Content + "\r\n");
-                };
-                tRT.OnRuntimeException += delegate(PaintRuntime sender, Language.RuntimeException e)
-                {
-                    writeLog(String.Format("运行时错误：{0}", e.Description), LogType.Error, e.Line);
-                };
+                writeLog("当前操作已被强制终止", LogType.Error);
 
-                // 执行
-                writeLog("正在执行...");
-                tWatch.Start();
-                tRT.RunAST(_AST);
-                tWatch.Stop();
-                writeLog(String.Format("执行完毕，耗时：{0} 秒", tWatch.ElapsedMilliseconds / 1000.0));
-
-                // 设置图片
-                this.Invoke((Action)delegate() {
-                    pictureBox_result.BackgroundImage = tRT.TargetBuffer;
-                    pictureBox_result.Width = pictureBox_result.BackgroundImage.Width;
-                    pictureBox_result.Height = pictureBox_result.BackgroundImage.Height;
+                this.Invoke((Action)delegate()
+                {
+                    toolStripButton_stop.Enabled = false;
+                    toolStripButton_restart.Enabled = true;
+                    toolStripButton_save.Enabled = false;
                 });
             }
         }
@@ -215,6 +258,34 @@ namespace raph
             {
                 this.Visible = false;
                 e.Cancel = true;
+            }
+        }
+
+        private void toolStripButton_stop_Click(object sender, EventArgs e)
+        {
+            if (_WorkThread.IsAlive)
+            {
+                _WorkThread.Abort();
+            }
+        }
+
+        private void toolStripButton_restart_Click(object sender, EventArgs e)
+        {
+            SubmitSourceCode(_SourceCode);
+        }
+
+        private void toolStripButton_save_Click(object sender, EventArgs e)
+        {
+            if (saveFileDialog_image.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                try
+                {
+                    pictureBox_result.BackgroundImage.Save(saveFileDialog_image.FileName, System.Drawing.Imaging.ImageFormat.Png);
+                }
+                catch (Exception Expt)
+                {
+                    MessageBox.Show("保存图片失败。\n\n详细信息：" + Expt.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
     }
