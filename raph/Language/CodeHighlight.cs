@@ -16,10 +16,6 @@ namespace raph.Language
         private static extern int SendMessage(IntPtr hWnd, int wMsg, int wParam, IntPtr lParam);
         private const int WM_SETREDRAW = 0xB;
         
-        private static readonly string[] KeywordList = new string[] {
-            "is", "for", "from", "to", "step" 
-        };
-
         private static readonly string[] ConstList = new string[] {
             "pi", "e"
         };
@@ -40,6 +36,7 @@ namespace raph.Language
             Symbol,          // 符号
             Digit,           // 数字
             Identifier,      // 标识符
+            String,          // 字符串
             Keyword,         // 关键词
             Const,           // 常量
             InternalFunction // 内置函数
@@ -75,6 +72,7 @@ namespace raph.Language
             SendMessage(TextBox.Handle, WM_SETREDRAW, 0, IntPtr.Zero);
 
             // 进行着色
+            bool bStringEscape = false;
             int tStateStart = From;
             HighlightState tState = HighlightState.Default;
             for (int i = From; i <= To; ++i)
@@ -95,6 +93,12 @@ namespace raph.Language
                             case '*':
                             case '/':
                             case ';':
+                            case '>':
+                            case '<':
+                            case '=':
+                            case '!':
+                            case '&':
+                            case '|':
                             case '(':
                             case ')':
                             case '{':
@@ -104,6 +108,12 @@ namespace raph.Language
                                 Handler(TextBox, tStateStart, i - 1, HighlightState.Default);
                                 tStateStart = i;
                                 tState = HighlightState.Symbol;
+                                break;
+                            case '"':
+                                Handler(TextBox, tStateStart, i - 1, HighlightState.Default);
+                                tStateStart = i;
+                                tState = HighlightState.String;
+                                bStringEscape = false;
                                 break;
                             default:
                                 if (c >= '0' && c <= '9')
@@ -137,6 +147,12 @@ namespace raph.Language
                             case '*':
                             case '/':
                             case ';':
+                            case '>':
+                            case '<':
+                            case '=':
+                            case '!':
+                            case '&':
+                            case '|':
                             case '(':
                             case ')':
                             case '{':
@@ -178,7 +194,7 @@ namespace raph.Language
                             // 截取字符串
                             string tIdentifier = TextBox.Text.Substring(tStateStart, i - tStateStart);
                             string tIdentifierLower = tIdentifier.ToLower();
-                            if (KeywordList.Contains(tIdentifierLower))
+                            if (Lexer.KeywordList.Contains(tIdentifierLower))
                                 tState = HighlightState.Keyword;
                             else if (ConstList.Contains(tIdentifierLower))
                                 tState = HighlightState.Const;
@@ -189,6 +205,32 @@ namespace raph.Language
                             tStateStart = i;
                             tState = HighlightState.Default;
                             i--;
+                        }
+                        break;
+                    case HighlightState.String:
+                        if (c == '\0' || c == '\n' || c == '\r')  // 错误的终止字符
+                        {
+                            Handler(TextBox, tStateStart, i, tState);
+                            tStateStart = i + 1;
+                            tState = HighlightState.Default;
+                        }
+                        else
+                        {
+                            if (!bStringEscape)
+                            {
+                                if (c == '"')
+                                {
+                                    Handler(TextBox, tStateStart, i, tState);
+                                    tStateStart = i + 1;
+                                    tState = HighlightState.Default;
+                                }
+                                else if (c == '\\')
+                                {
+                                    bStringEscape = true;
+                                }
+                            }
+                            else
+                                bStringEscape = false;
                         }
                         break;
                 }

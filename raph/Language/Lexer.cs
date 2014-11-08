@@ -61,7 +61,7 @@ namespace raph.Language
         }
 
         // 关键词列表
-        private static readonly string[] KeywordList = new string[]
+        public static readonly string[] KeywordList = new string[]
         {
             "is",   "if",    "else",  "true",     "false",  "for",     "from", "to",
             "step", "while", "break", "continue", "return", "function"

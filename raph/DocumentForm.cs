@@ -67,6 +67,11 @@ namespace raph
                     TextBox.SelectionFont = TextBox.Font;
                     TextBox.SelectionColor = Color.LightSalmon;
                     break;
+                case Language.CodeHighlight.HighlightState.String:
+                    TextBox.Select(From, To - From + 1);
+                    TextBox.SelectionFont = TextBox.Font;
+                    TextBox.SelectionColor = Color.DarkRed;
+                    break;
                 default:
                     TextBox.Select(From, To - From + 1);
                     TextBox.SelectionFont = TextBox.Font;
