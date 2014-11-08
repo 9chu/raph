@@ -29,13 +29,14 @@ namespace raph.Language
             6, // NotEqual
             7, // LogicalAnd
             8, // LogicalOr
-            4  // Assign
+            4, // Assign
+            5  // SpaceShip
         };
 
         /// <summary>
         /// 二元算符的最小优先级
         /// </summary>
-        private static readonly int MaxBinaryOperatorPriority = 8;
+        private static readonly int MaxBinaryOperatorPriority = 9;
 
         /// <summary>
         /// 匹配一个Token
@@ -133,10 +134,31 @@ namespace raph.Language
                 Result = ParseIfStatement(Lex);
             else if (Lex.CurrentToken == Lexer.Token.Identifier)  // assignment or call
                 Result = ParseAssignmentOrCall(Lex);
+            else if (Lex.CurrentToken == Lexer.Token.Function)  // function
+                Result = ParseFunctionDeclaretion(Lex);
             else
             {
-                Result = null;
-                return false;
+                int tLine = Lex.Line;
+                if (TryMatchToken(Lex, Lexer.Token.Break))  // break
+                {
+                    Result = new ASTNode.Break(tLine);
+                    MatchToken(Lex, Lexer.Token.Semico);  // ;
+                }
+                else if (TryMatchToken(Lex, Lexer.Token.Continue))  // continue
+                {
+                    Result = new ASTNode.Continue(tLine);
+                    MatchToken(Lex, Lexer.Token.Semico);  // ;
+                }
+                else if (TryMatchToken(Lex, Lexer.Token.Return))  // return
+                {
+                    Result = new ASTNode.Return(tLine, ParseExpression(Lex));
+                    MatchToken(Lex, Lexer.Token.Semico);  // ;
+                }
+                else
+                {
+                    Result = null;
+                    return false;
+                }
             }
             return true;
         }
@@ -166,11 +188,11 @@ namespace raph.Language
         {
             ASTNode.StatementList tRet;
 
-            if (TryMatchToken(Lex, Lexer.Token.Begin))  // begin
+            if (TryMatchToken(Lex, Lexer.Token.LeftBrace))  // {
             {
                 tRet = ParseStatementList(Lex);
 
-                MatchToken(Lex, Lexer.Token.End);  // end
+                MatchToken(Lex, Lexer.Token.RightBrace);  // }
 
                 return tRet;
             }
@@ -215,6 +237,59 @@ namespace raph.Language
         }
 
         /// <summary>
+        /// 解析函数形参表
+        /// </summary>
+        /// <param name="Lex">词法分析器</param>
+        /// <returns>解析结果</returns>
+        private static ASTNode.FunctionArgList ParseFunctionArgList(Lexer Lex)
+        {
+            ASTNode.FunctionArgList tRet = new ASTNode.FunctionArgList();
+            if (Lex.CurrentToken != Lexer.Token.RightBracket) // 非空arglist
+            {
+                while (true)
+                {
+                    if (Lex.CurrentToken == Lexer.Token.Identifier)
+                    {
+                        tRet.Args.Add(new ASTNode.SymbolExpression(Lex.Line, Lex.Identify));
+                        Lex.Next();
+                    }
+                    else
+                        throw new SyntaxException(Lex.Position, Lex.Line, Lex.Row,
+                            String.Format("unexpected token {0}.", Lex.FormatCurrentToken()));
+
+                    if (TryMatchToken(Lex, Lexer.Token.Comma))  // ','
+                        continue;
+                    else if (Lex.CurrentToken == Lexer.Token.RightBracket)  // peek ')'
+                        break;
+                    else
+                        throw new SyntaxException(Lex.Position, Lex.Line, Lex.Row,
+                            String.Format("unexpected token {0}.", Lex.FormatCurrentToken()));
+                }
+            }
+            return tRet;
+        }
+
+        /// <summary>
+        /// 解析函数声明
+        /// </summary>
+        /// <param name="Lex">词法分析器</param>
+        /// <returns>解析结果</returns>
+        private static ASTNode.FunctionDeclaration ParseFunctionDeclaretion(Lexer Lex)
+        {
+            int tLine = Lex.Line;
+            
+            // function <identifier> ( <function_arglist> ) <block>
+            MatchToken(Lex, Lexer.Token.Function);
+            string tIdentifier = MatchIdentifier(Lex);
+            MatchToken(Lex, Lexer.Token.LeftBracket);
+            ASTNode.FunctionArgList tArgList = ParseFunctionArgList(Lex);
+            MatchToken(Lex, Lexer.Token.RightBracket);
+            ASTNode.StatementList tExecBlock = ParseBlock(Lex);
+
+            return new ASTNode.FunctionDeclaration(tLine, tIdentifier, tArgList, tExecBlock);
+        }
+
+        /// <summary>
         /// 解析For语句
         /// </summary>
         /// <param name="Lex">词法分析器</param>
@@ -251,7 +326,7 @@ namespace raph.Language
             ASTNode.Expression tConditionExpression = ParseExpression(Lex);
             ASTNode.StatementList tExecBlock = ParseBlock(Lex);
 
-            return new ASTNode.WhileStatement(tConditionExpression, tExecBlock, tLine);
+            return new ASTNode.WhileStatement(tLine, tConditionExpression, tExecBlock);
         }
         
         /// <summary>
@@ -269,7 +344,7 @@ namespace raph.Language
             ASTNode.StatementList tElseBlock = null;
             if (TryMatchToken(Lex, Lexer.Token.Else))
                 tElseBlock = ParseBlock(Lex);
-            return new ASTNode.IfStatement(tConditionExpression, tThenBlock, tElseBlock, tLine);
+            return new ASTNode.IfStatement(tLine, tConditionExpression, tThenBlock, tElseBlock);
         }
 
         /// <summary>

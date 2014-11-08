@@ -14,6 +14,17 @@ namespace raph.Language
         private static readonly RuntimeValue DefaultForStepSize = new RuntimeValue.Digit(1);
         private static readonly RuntimeValue DefaultForStepSizeReverse = new RuntimeValue.Digit(-1);
 
+        /// <summary>
+        /// 块执行结果
+        /// </summary>
+        public enum BlockExecResult
+        {
+            Normal,   // 正常结束
+            Return,   // 返回
+            Break,    // 跳出
+            Continue  // 继续
+        }
+
         private RuntimeContext _RootContext = new RuntimeContext(null);
 
         /// <summary>
@@ -185,7 +196,7 @@ namespace raph.Language
                                     String.Format("right hand expression of LogicAnd operator must return boolean."));
                             return tRightVar;
                         }
-                        else if (tBinaryExpression.BinaryOperator == BinaryOp.LogicalOr)
+                        else if (tBinaryExpression.BinaryOperator == BinaryOp.LogicalOr)  // 特殊处理||操作
                         {
                             RuntimeValue tLeftVar = execExpressionAST(Context, tBinaryExpression.Left);
                             if (tLeftVar.ValueType != RuntimeValueType.Boolean)
@@ -200,6 +211,44 @@ namespace raph.Language
                                 throw new RuntimeException(tBinaryExpression.Right.LineNumber,
                                     String.Format("right hand expression of LogicOr operator must return boolean."));
                             return tRightVar;
+                        }
+                        else if (tBinaryExpression.BinaryOperator == BinaryOp.SpaceShip)  // 特殊处理<=>操作
+                        {
+                            RuntimeValue tLeftVar = execExpressionAST(Context, tBinaryExpression.Left);
+                            RuntimeValue tRightVar = execExpressionAST(Context, tBinaryExpression.Right);
+                            try
+                            {
+                                RuntimeValue tTest = tLeftVar.ApplyBinaryOperator(BinaryOp.Less, tRightVar);
+                                if (tTest.ValueType != RuntimeValueType.Boolean)
+                                    throw new RuntimeException(tBinaryExpression.Right.LineNumber,
+                                        String.Format("SpaceShip operation requires a boolean type on the result of Less opearation on type {0} and type {1}.",
+                                            tLeftVar.TypeToString(), tRightVar.TypeToString()));
+                                RuntimeValue.Boolean tBoolean = (RuntimeValue.Boolean)tTest;
+                                if (tBoolean.Value)
+                                    return new RuntimeValue.Digit(-1);
+                            }
+                            catch (NotSupportedException)
+                            {
+                                throw new RuntimeException(tBinaryExpression.LineNumber,
+                                    String.Format("can't apply Less operator on type {0} and type {1}.", tLeftVar.TypeToString(), tRightVar.TypeToString()));
+                            }
+                            try
+                            {
+                                RuntimeValue tTest = tLeftVar.ApplyBinaryOperator(BinaryOp.Greater, tRightVar);
+                                if (tTest.ValueType != RuntimeValueType.Boolean)
+                                    throw new RuntimeException(tBinaryExpression.Right.LineNumber,
+                                        String.Format("SpaceShip operation requires a boolean type on the result of Greater opearation on type {0} and type {1}.",
+                                            tLeftVar.TypeToString(), tRightVar.TypeToString()));
+                                RuntimeValue.Boolean tBoolean = (RuntimeValue.Boolean)tTest;
+                                if (tBoolean.Value)
+                                    return new RuntimeValue.Digit(1);
+                            }
+                            catch (NotSupportedException)
+                            {
+                                throw new RuntimeException(tBinaryExpression.LineNumber,
+                                    String.Format("can't apply Greater operator on type {0} and type {1}.", tLeftVar.TypeToString(), tRightVar.TypeToString()));
+                            }
+                            return new RuntimeValue.Digit(0);
                         }
                         else
                         {
@@ -274,6 +323,10 @@ namespace raph.Language
                             throw new RuntimeException(tCallExpression.LineNumber,
                                 String.Format("function \"{0}\" requires {1} arg(s), but {2} arg(s) are given.", tCallExpression.Identifier, e.ArgumentRequired, e.ArgumentGiven));
                         }
+                        catch (RuntimeException e)
+                        {
+                            throw e;  // 穿透
+                        }
                         catch (Exception e)  // 一般性错误
                         {
                             throw new RuntimeException(tCallExpression.LineNumber,
@@ -312,7 +365,7 @@ namespace raph.Language
 
         // 执行一个语句块
         // 处理异常转换
-        private void execBlockAST(RuntimeContext Context, ASTNode.StatementList AST)
+        private BlockExecResult execBlockAST(RuntimeContext Context, ASTNode.StatementList AST, out RuntimeValue ReturnValue)
         {
             foreach (ASTNode.Statement s in AST.Statements)
             {
@@ -368,6 +421,10 @@ namespace raph.Language
                             {
                                 throw new RuntimeException(s.LineNumber,
                                     String.Format("function \"{0}\" requires {1} arg(s), but {2} arg(s) are given.", tCall.Identifier, e.ArgumentRequired, e.ArgumentGiven));
+                            }
+                            catch (RuntimeException e)
+                            {
+                                throw e;  // 穿透
                             }
                             catch (Exception e)  // 一般性错误
                             {
@@ -471,7 +528,11 @@ namespace raph.Language
                                 }
 
                                 // 执行函数体
-                                execBlockAST(Context, tForStatement.ExecBlock);
+                                BlockExecResult tExecResult = execBlockAST(Context, tForStatement.ExecBlock, out ReturnValue);
+                                if (tExecResult == BlockExecResult.Break)
+                                    break;
+                                else if (tExecResult == BlockExecResult.Return)
+                                    return BlockExecResult.Return;
 
                                 // Step计数
                                 try
@@ -496,7 +557,13 @@ namespace raph.Language
                                         String.Format("the result of while condition expression must be a boolean."));
                                 RuntimeValue.Boolean tBoolean = (RuntimeValue.Boolean)tTest;
                                 if (tBoolean.Value)
-                                    execBlockAST(Context, tWhileStatement.ExecBlock);
+                                {
+                                    BlockExecResult tExecResult = execBlockAST(Context, tWhileStatement.ExecBlock, out ReturnValue);
+                                    if (tExecResult == BlockExecResult.Break)
+                                        break;
+                                    else if (tExecResult == BlockExecResult.Return)
+                                        return BlockExecResult.Return;
+                                }   
                                 else
                                     break;
                             }
@@ -511,18 +578,57 @@ namespace raph.Language
                                     String.Format("the result of if condition expression must be a boolean."));
                             RuntimeValue.Boolean tBoolean = (RuntimeValue.Boolean)tTest;
                             if (tBoolean.Value)  // then
-                                execBlockAST(Context, tIfStatement.ThenBlock);
+                            {
+                                BlockExecResult tExecResult = execBlockAST(Context, tIfStatement.ThenBlock, out ReturnValue);
+                                if (tExecResult != BlockExecResult.Normal)
+                                    return tExecResult;
+                            }   
                             else
                             {
                                 if (tIfStatement.ElseBlock != null)  // else
-                                    execBlockAST(Context, tIfStatement.ElseBlock);
+                                {
+                                    BlockExecResult tExecResult = execBlockAST(Context, tIfStatement.ElseBlock, out ReturnValue);
+                                    if (tExecResult != BlockExecResult.Normal)
+                                        return tExecResult;
+                                }   
                             }
+                        }
+                        break;
+                    case ASTNode.ASTType.Break:
+                        ReturnValue = null;
+                        return BlockExecResult.Break;
+                    case ASTNode.ASTType.Continue:
+                        ReturnValue = null;
+                        return BlockExecResult.Continue;
+                    case ASTNode.ASTType.Return:
+                        {
+                            ASTNode.Return tReturn = (ASTNode.Return)s;
+                            ReturnValue = execExpressionAST(Context, tReturn.ReturnExpression);
+                            return BlockExecResult.Return;
+                        }
+                    case ASTNode.ASTType.FunctionDeclaration:
+                        {
+                            ASTNode.FunctionDeclaration tFunctionDeclaration = (ASTNode.FunctionDeclaration)s;
+                            ASTNode.FunctionArgList tFunctionArgList = tFunctionDeclaration.DeclareArgList;
+
+                            // 产生小写形式形参表
+                            string[] tArgList = new string[tFunctionArgList.Args.Count];
+                            for (int i = 0; i < tFunctionArgList.Args.Count; ++i)
+                            {
+                                tArgList[i] = tFunctionArgList.Args[i].IdentifierLower;
+                            }
+                            
+                            // 在当前环境中注册函数
+                            Context.Set(tFunctionDeclaration.IdentifierLower, new RuntimeValue.Function(
+                                execBlockAST, Context, tArgList, s.LineNumber, tFunctionDeclaration.ExecBlock));
                         }
                         break;
                     default:
                         throw new RuntimeException(s.LineNumber, "internal error, current syntax not implemented.");
                 }
             }
+            ReturnValue = null;
+            return BlockExecResult.Normal;
         }
 
         /// <summary>
@@ -531,7 +637,19 @@ namespace raph.Language
         /// <param name="StatementList">语法树对象</param>
         public void ExecAST(ASTNode.StatementList AST)
         {
-            execBlockAST(_RootContext, AST);
+            RuntimeValue tVarNotUse;
+            BlockExecResult tResult = execBlockAST(_RootContext, AST, out tVarNotUse);
+            switch (tResult)
+            {
+                case BlockExecResult.Return:
+                    throw new RuntimeException(-1, "unexpected return operation in top block.");
+                case BlockExecResult.Break:
+                    throw new RuntimeException(-1, "unexpected break operation in top block.");
+                case BlockExecResult.Continue:
+                    throw new RuntimeException(-1, "unexpected continue operation in top block.");
+                default:
+                    break;
+            }
         }
 
         public Runtime()

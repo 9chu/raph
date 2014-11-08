@@ -18,25 +18,27 @@
     rot is pi/2;  // 旋转
 
     -- 绘图
-    for count from 1 to 3 begin
+    for count from 1 to 3 {
         rot is rot + pi / 3;
         for ang from 0 to 2*pi step pi/80
             draw(cos(ang), sin(ang));
-    end
+    }
 ```
 
 ### 词法元素
 
+- 不区分大小写（题目要求）
+
 - 关键词：
 
 ```
-    is begin end if else while for from to step true false while
+    is if else while for from to step true false while break continue return function
 ```
 
 - 运算符：
 
 ```
-    + - * / ** > < >= <= == != && || = !
+    + - * / ** > < >= <= == != && || = ! <=>
 ```
 
 - 分隔符：
@@ -54,20 +56,22 @@
 ### 语法范式
 
 ```
-    block := begin statement_list end | statement
+    block := { statement_list } | statement
     statement_list := statement_list statement | ε
-    statement := assignment | call | for_statement | while_statement | if_statement
+    statement := assignment | call | for_statement | while_statement | if_statement | function_declaration
     initialization := <identifier> is <expression>;
     assignment := <identifier> = <expression>;
     call := <identifier> ( <arg_list> );
     for_statement := for <identifier> from <expression> to <expression> step <expression> <block> | for <identifier> from <expression> to <expression> <block>
     if_statement := if <expression> <block> else <block> | if <expression> <block>
     while_statement := while <expression> <block>
+    function_declaration := function <identifier> ( <function_arglist> ) <block>
     expression := <logic_expression>
     logic_expression := <logic_expression> && <relation_expression> | <logic_expression> || <relation_expression>
     relation_expression := <relation_expression> > <assign_expression> | <relation_expression> < <assign_expression> | 
         <relation_expression> >= <assign_expression> | <relation_expression> <= <assign_expression> | 
-        <relation_expression> == <assign_expression> | <relation_expression> != <assign_expression> | <assign_expression>
+        <relation_expression> == <assign_expression> | <relation_expression> != <assign_expression> | 
+        <relation_expression> <=> <assign_expression> | <assign_expression>
     assign_expression := <assign_expression> = <plusminus_expression> | <plusminus_expression>
     plusminus_expression := <plusminus_expression> + <term_expression> | <plusminus_expression> - <term_expression> | <term_expression>
     term_expression := <term_expression> * <sub_expression> | <term_expression> / <sub_expression> | <power_expression>
@@ -75,7 +79,8 @@
     unary_expression := - <atom_expression> | <atom_expression>
     atom_expression :=  ( <bracket_expression> ) | <call_expression> | <digit_literal> | <identifier> | <string_literal> | true | false
     call_expression := <identifier> ( <arg_list> )
-    arg_list := arg_list, expression | expression
+    arg_list := arg_list, expression | expression | ε
+    function_arglist := function_arglist, <identifier> | <identifier> | ε
     bracket_expression := bracket_expression , expression | expression
 ```
 

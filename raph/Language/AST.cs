@@ -24,7 +24,8 @@ namespace raph.Language
         NotEqual,
         LogicalAnd,
         LogicalOr,
-        Assign
+        Assign,
+        SpaceShip
     }
 
     /// <summary>
@@ -54,6 +55,11 @@ namespace raph.Language
             ForStatement,
             WhileStatement,
             IfStatement,
+            Break,
+            Continue,
+            Return,
+            FunctionDeclaration,
+            FunctionArgList,
 
             // 表达式组成成分
             BinaryExpression,
@@ -113,6 +119,41 @@ namespace raph.Language
                 : base(AType, LineNum) { }
         }
 
+        public class Break : Statement
+        {
+            public Break(int LineNum)
+                : base(ASTType.Break, LineNum) { }
+        }
+
+        public class Continue : Statement
+        {
+            public Continue(int LineNum)
+                : base(ASTType.Continue, LineNum) { }
+        }
+
+        public class Return : Statement
+        {
+            private Expression _ReturnExpression;
+
+            public Expression ReturnExpression
+            {
+                get
+                {
+                    return _ReturnExpression;
+                }
+                set
+                {
+                    _ReturnExpression = value;
+                }
+            }
+
+            public Return(int LineNum, Expression Expr)
+                : base(ASTType.Return, LineNum)
+            {
+                _ReturnExpression = Expr;
+            }
+        }
+        
         public class Initialization : Statement
         {
             private string _Identifier = String.Empty;
@@ -365,7 +406,7 @@ namespace raph.Language
                 }
             }
 
-            public WhileStatement(Expression ConditionExpr, StatementList Block, int LineNum)
+            public WhileStatement(int LineNum, Expression ConditionExpr, StatementList Block)
                 : base(ASTType.WhileStatement, LineNum)
             {
                 _ConditionExpression = ConditionExpr;
@@ -415,13 +456,90 @@ namespace raph.Language
                 }
             }
 
-            public IfStatement(Expression Condition, StatementList Then, StatementList Else, int LineNum)
+            public IfStatement(int LineNum, Expression Condition, StatementList Then, StatementList Else)
                 : base(ASTType.IfStatement, LineNum)
             {
                 _ConditionExpression = Condition;
                 _ThenBlock = Then;
                 _ElseBlock = Else;
             }
+        }
+
+        public class FunctionDeclaration : Statement
+        {
+            private string _Identifier = String.Empty;
+            private string _IdentifierLower = String.Empty;
+            private FunctionArgList _ArgList = null;
+            private StatementList _ExecBlock = null;
+
+            public string Identifier
+            {
+                get
+                {
+                    return _Identifier;
+                }
+                set
+                {
+                    _Identifier = value;
+                    _IdentifierLower = _Identifier.ToLower();
+                }
+            }
+
+            public string IdentifierLower
+            {
+                get
+                {
+                    return _IdentifierLower;
+                }
+            }
+
+            public FunctionArgList DeclareArgList
+            {
+                get
+                {
+                    return _ArgList;
+                }
+                set
+                {
+                    _ArgList = value;
+                }
+            }
+
+            public StatementList ExecBlock
+            {
+                get
+                {
+                    return _ExecBlock;
+                }
+                set
+                {
+                    _ExecBlock = value;
+                }
+            }
+
+            public FunctionDeclaration(int LineNum, string Id, FunctionArgList AL, StatementList Block)
+                : base(ASTType.FunctionDeclaration, LineNum)
+            {
+                Identifier = Id;
+                DeclareArgList = AL;
+                ExecBlock = Block;
+            }
+        }
+
+        public class FunctionArgList : ASTNode
+        {
+            private List<SymbolExpression> _Args = new List<SymbolExpression>();
+
+            public IList<SymbolExpression> Args
+            {
+                get
+                {
+                    return _Args;
+                }
+            }
+
+            public FunctionArgList()
+                : base(ASTType.FunctionArgList) { }
         }
 
         public class ArgList : ASTNode

@@ -15,7 +15,8 @@ namespace raph.Language
         Boolean,           // 逻辑
         Digit,             // 数字
         Tuple,             // 元组
-        String             // 字符串
+        String,            // 字符串
+        Function           // 函数
     }
 
     /// <summary>
@@ -112,6 +113,8 @@ namespace raph.Language
                     return "tuple";
                 case RuntimeValueType.String:
                     return "string";
+                case RuntimeValueType.Function:
+                    return "function";
                 default:
                     return "unknown";
             }
@@ -435,7 +438,29 @@ namespace raph.Language
             
             public override RuntimeValue ApplyBinaryOperator(BinaryOp OperatorType, RuntimeValue RightValueRef)
             {
-                return new String(_Value + RightValueRef.DataToString());
+                if (OperatorType == BinaryOp.Plus)
+                    return new String(_Value + RightValueRef.DataToString());
+                else if (RightValueRef.ValueType == RuntimeValueType.String)
+                {
+                    String r = (String)RightValueRef;
+                    switch (OperatorType)
+                    {
+                        case BinaryOp.Greater:
+                            return new Boolean(_Value.CompareTo(r.Value) > 0);
+                        case BinaryOp.Less:
+                            return new Boolean(_Value.CompareTo(r.Value) < 0);
+                        case BinaryOp.GreaterEqual:
+                            return new Boolean(_Value.CompareTo(r.Value) >= 0);
+                        case BinaryOp.LessEqual:
+                            return new Boolean(_Value.CompareTo(r.Value) <= 0);
+                        case BinaryOp.Equal:
+                            return new Boolean(_Value == r.Value);
+                        case BinaryOp.NotEqual:
+                            return new Boolean(_Value != r.Value);
+                    }
+                }
+                
+                return base.ApplyBinaryOperator(OperatorType, RightValueRef);
             }
 
             public override string DataToString()
@@ -447,6 +472,99 @@ namespace raph.Language
                 : base(RuntimeValueType.String)
             {
                 _Value = Value;
+            }
+        }
+
+        /// <summary>
+        /// 函数
+        /// </summary>
+        public class Function : RuntimeValue
+        {
+            public delegate Runtime.BlockExecResult ExecBlockASTHandler(RuntimeContext Context, ASTNode.StatementList AST, out RuntimeValue ReturnValue);
+
+            private ExecBlockASTHandler _ExecHandler;
+            private RuntimeContext _ParentContext;
+            private string[] _ArgListLower;
+            private int _FunctionLineNumber;
+            private ASTNode.StatementList _ExecBlock;
+
+            public ExecBlockASTHandler ExecHandler
+            {
+                get
+                {
+                    return _ExecHandler;
+                }
+            }
+
+            public RuntimeContext ParentContext
+            {
+                get
+                {
+                    return _ParentContext;
+                }
+            }
+
+            public string[] ArgListLower
+            {
+                get
+                {
+                    return _ArgListLower;
+                }
+            }
+
+            public int FunctionLineNumber
+            {
+                get
+                {
+                    return _FunctionLineNumber;
+                }
+            }
+
+            public ASTNode.StatementList ExecBlock
+            {
+                get
+                {
+                    return _ExecBlock;
+                }
+            }
+
+            public override RuntimeValue ApplyCallOperator(RuntimeContext Context, RuntimeValue[] Args)
+            {
+                // 创建一个局部环境并初始化参数列表
+                RuntimeContext tContext = new RuntimeContext(_ParentContext);
+                for (int i = 0; i < _ArgListLower.Length; ++i)
+                {
+                    if (i < Args.Length)
+                        tContext.Set(_ArgListLower[i], Args[i]);
+                    else
+                        tContext.Set(_ArgListLower[i], new None());
+                }
+
+                // 调用函数
+                RuntimeValue tRet;
+                Runtime.BlockExecResult tResult = _ExecHandler(tContext, _ExecBlock, out tRet);
+                switch (tResult)
+                {
+                    case Runtime.BlockExecResult.Break:
+                        throw new RuntimeException(_FunctionLineNumber, "unexpected break operation in function block.");
+                    case Runtime.BlockExecResult.Continue:
+                        throw new RuntimeException(_FunctionLineNumber, "unexpected continue operation in function block.");
+                    default:
+                        break;
+                }
+                if (tRet == null)
+                    tRet = new None();
+                return tRet;
+            }
+
+            public Function(ExecBlockASTHandler Handler, RuntimeContext Context, string[] ArgListLower, int FunctionLineNumber, ASTNode.StatementList ExecBlock)
+                : base(RuntimeValueType.Function)
+            {
+                _ExecHandler = Handler;
+                _ParentContext = Context;
+                _ArgListLower = ArgListLower;
+                _FunctionLineNumber = FunctionLineNumber;
+                _ExecBlock = ExecBlock;
             }
         }
         #endregion

@@ -41,11 +41,10 @@ namespace raph.Language
             LogicalAnd,      // &&
             LogicalOr,       // ||
             Assign,          // =
+            SpaceShip,       // <=> 太空船操作符
 
             // 关键词
             Is = 100,
-            Begin,
-            End,
             If,
             Else,
             True,
@@ -54,13 +53,18 @@ namespace raph.Language
             From,
             To,
             Step,
-            While
+            While,
+            Break,
+            Continue,
+            Return,
+            Function
         }
 
         // 关键词列表
         private static readonly string[] KeywordList = new string[]
         {
-            "is", "begin", "end", "if", "else", "true", "false", "for", "from", "to", "step", "while"
+            "is",   "if",    "else",  "true",     "false",  "for",     "from", "to",
+            "step", "while", "break", "continue", "return", "function"
         };
 
         /// <summary>
@@ -520,7 +524,13 @@ namespace raph.Language
                     if (peekNext() == '=')  // <=
                     {
                         readNext();
-                        _CurToken = Token.LessEqual;
+                        if (peekNext() == '>')  // <=>
+                        {
+                            readNext();
+                            _CurToken = Token.SpaceShip;
+                        }
+                        else
+                            _CurToken = Token.LessEqual;
                     }
                     else
                         _CurToken = Token.Less;  // <
