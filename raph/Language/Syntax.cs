@@ -219,14 +219,14 @@ namespace raph.Language
         private static ASTNode.ArgList ParseArgList(Lexer Lex)
         {
             ASTNode.ArgList tRet = new ASTNode.ArgList();
-            if (Lex.CurrentToken != Lexer.Token.RightBracket) // 非空arglist
+            if (Lex.CurrentToken != Lexer.Token.RightBraket) // 非空arglist
             {
                 while (true)
                 {
                     tRet.Args.Add(ParseExpression(Lex));
                     if (TryMatchToken(Lex, Lexer.Token.Comma))  // ','
                         continue;
-                    else if (Lex.CurrentToken == Lexer.Token.RightBracket)  // peek ')'
+                    else if (Lex.CurrentToken == Lexer.Token.RightBraket)  // peek ')'
                         break;
                     else
                         throw new SyntaxException(Lex.Position, Lex.Line, Lex.Row,
@@ -244,7 +244,7 @@ namespace raph.Language
         private static ASTNode.FunctionArgList ParseFunctionArgList(Lexer Lex)
         {
             ASTNode.FunctionArgList tRet = new ASTNode.FunctionArgList();
-            if (Lex.CurrentToken != Lexer.Token.RightBracket) // 非空arglist
+            if (Lex.CurrentToken != Lexer.Token.RightBraket) // 非空arglist
             {
                 while (true)
                 {
@@ -259,7 +259,7 @@ namespace raph.Language
 
                     if (TryMatchToken(Lex, Lexer.Token.Comma))  // ','
                         continue;
-                    else if (Lex.CurrentToken == Lexer.Token.RightBracket)  // peek ')'
+                    else if (Lex.CurrentToken == Lexer.Token.RightBraket)  // peek ')'
                         break;
                     else
                         throw new SyntaxException(Lex.Position, Lex.Line, Lex.Row,
@@ -281,9 +281,9 @@ namespace raph.Language
             // function <identifier> ( <function_arglist> ) <block>
             MatchToken(Lex, Lexer.Token.Function);
             string tIdentifier = MatchIdentifier(Lex);
-            MatchToken(Lex, Lexer.Token.LeftBracket);
+            MatchToken(Lex, Lexer.Token.LeftBraket);
             ASTNode.FunctionArgList tArgList = ParseFunctionArgList(Lex);
-            MatchToken(Lex, Lexer.Token.RightBracket);
+            MatchToken(Lex, Lexer.Token.RightBraket);
             ASTNode.StatementList tExecBlock = ParseBlock(Lex);
 
             return new ASTNode.FunctionDeclaration(tLine, tIdentifier, tArgList, tExecBlock);
@@ -356,11 +356,11 @@ namespace raph.Language
         {
             int tLine = Lex.Line;
             string tIdentifier = MatchIdentifier(Lex);
-            if (TryMatchToken(Lex, Lexer.Token.LeftBracket))  // call
+            if (TryMatchToken(Lex, Lexer.Token.LeftBraket))  // call
             {
                 ASTNode.Call tCall = new ASTNode.Call(tLine, tIdentifier, ParseArgList(Lex));
 
-                MatchToken(Lex, Lexer.Token.RightBracket);  // ')'
+                MatchToken(Lex, Lexer.Token.RightBraket);  // ')'
                 MatchToken(Lex, Lexer.Token.Semico);  // ';'
                 return tCall;
             }
@@ -505,20 +505,20 @@ namespace raph.Language
                 string tIdentifier = MatchIdentifier(Lex);
 
                 // 检查下一个符号
-                if (TryMatchToken(Lex, Lexer.Token.LeftBracket))  // '(' -- call_expression
+                if (TryMatchToken(Lex, Lexer.Token.LeftBraket))  // '(' -- call_expression
                 {
                     ASTNode.ArgList tArgList = ParseArgList(Lex);
-                    MatchToken(Lex, Lexer.Token.RightBracket);  // ')'
+                    MatchToken(Lex, Lexer.Token.RightBraket);  // ')'
                     return new ASTNode.CallExpression(Lex.Line, tIdentifier, tArgList);
                 }
                 else  // symbol
                     return new ASTNode.SymbolExpression(Lex.Line, tIdentifier);
             }
-            else if (TryMatchToken(Lex, Lexer.Token.LeftBracket))  // '(' -- bracket_expression
+            else if (TryMatchToken(Lex, Lexer.Token.LeftBraket))  // '(' -- bracket_expression
             {
                 tRet = ParseBracketExpression(Lex);
 
-                MatchToken(Lex, Lexer.Token.RightBracket);  // ')'
+                MatchToken(Lex, Lexer.Token.RightBraket);  // ')'
                 return tRet;
             }
             else
@@ -539,7 +539,7 @@ namespace raph.Language
             ASTNode.Expression tFirstExpr = ParseExpression(Lex);
             
             // 检查后续元素
-            if (Lex.CurrentToken != Lexer.Token.RightBracket)
+            if (Lex.CurrentToken != Lexer.Token.RightBraket)
             {
                 ASTNode.TupleExpression tList = new ASTNode.TupleExpression(Lex.Line);
                 tList.Args.Add(tFirstExpr);
@@ -551,7 +551,7 @@ namespace raph.Language
 
                     if (Lex.CurrentToken == Lexer.Token.Comma)  // peek ','
                         continue;
-                    if (Lex.CurrentToken == Lexer.Token.RightBracket)  // peek ')'
+                    if (Lex.CurrentToken == Lexer.Token.RightBraket)  // peek ')'
                         break;
                     else
                         throw new SyntaxException(Lex.Position, Lex.Line, Lex.Row,

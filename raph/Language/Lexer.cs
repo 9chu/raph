@@ -16,11 +16,14 @@ namespace raph.Language
         {
             EOF,             // EOF
             Semico,          // ;
-            LeftBracket,     // (
-            RightBracket,    // )
+            LeftBraket,      // (
+            RightBraket,     // )
             LeftBrace,       // {
             RightBrace,      // }
+            LeftBracket,     // [
+            RightBracket,    // ]
             Comma,           // ,
+            Dot,             // .
             Not,             // !
             DigitLiteral,    // 数字字面量
             StringLiteral,   // 字符串字面量
@@ -80,16 +83,22 @@ namespace raph.Language
                     return "<EOF>";
                 case Token.Semico:
                     return "';'";
-                case Token.LeftBracket:
+                case Token.LeftBraket:
                     return "'('";
-                case Token.RightBracket:
+                case Token.RightBraket:
                     return "')'";
                 case Token.LeftBrace:
                     return "'{'";
                 case Token.RightBrace:
                     return "'}'";
+                case Token.LeftBracket:
+                    return "'['";
+                case Token.RightBracket:
+                    return "']'";
                 case Token.Comma:
                     return "','";
+                case Token.Dot:
+                    return "'.'";
                 case Token.Plus:
                     return "'+'";
                 case Token.Minus:
@@ -469,11 +478,11 @@ namespace raph.Language
                     return;
                 case '(':
                     readNext();
-                    _CurToken = Token.LeftBracket;
+                    _CurToken = Token.LeftBraket;
                     return;
                 case ')':
                     readNext();
-                    _CurToken = Token.RightBracket;
+                    _CurToken = Token.RightBraket;
                     return;
                 case '{':
                     readNext();
@@ -483,9 +492,21 @@ namespace raph.Language
                     readNext();
                     _CurToken = Token.RightBrace;
                     return;
+                case '[':
+                    readNext();
+                    _CurToken = Token.LeftBracket;
+                    return;
+                case ']':
+                    readNext();
+                    _CurToken = Token.RightBracket;
+                    return;
                 case ',':
                     readNext();
                     _CurToken = Token.Comma;
+                    return;
+                case '.':
+                    readNext();
+                    _CurToken = Token.Dot;
                     return;
                 case '+':
                     readNext();
